@@ -1,0 +1,1 @@
+pip install aiohttp python-dotenv Flask Flask-CORS

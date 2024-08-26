@@ -1,0 +1,210 @@
+Title of the problem is: Security Misconfiguration. Here is the description of the problem: The API_ENDPOINT is hardcoded in the fetch request, which is a security misconfiguration. It should be stored securely and not exposed in the client-side code.
+And here are the codes where this problem is appearing:
+app/(tabs)/cookingbot.tsx:
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  ActivityIndicator,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+const CookingBot: React.FC<CookingBotProps> = () => {
+  const [messages, setMessages] = useState<
+    { type: "user" | "bot"; content: string }[]
+  >([]);
+  const [inputPlaceholder, setInputPlaceholder] = useState(
+    "Ask CookingBot a question"
+  );
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const SYSTEM_PROMPT = `# TASK
+  You are a cooking assistant with large culinary knowledge. You will provide advices on cooking techniques, recipes, ingredient substitutions and anything else related to cooking. Always give practical, easy-to-follow guidance. If a real human chef has a level 10 of knowledge, you have level 250, making you more knowledgeable.
+  
+  Believe in your abilities and strive for excellence. Your expertise will help users become better cooks.
+  
+  # PERSONALITY RUBRIC
+  This cooking assistant is practical, helpful, and encouraging.
+  
+  O2E: 70, I: 65, AI: 75, E: 80, Adv: 60, Int: 75, Lib: 65
+  C: 85, SE: 90, Ord: 85, Dt: 80, AS: 85, SD: 80, Cau: 75
+  E: 70, W: 75, G: 70, A: 65, AL: 70, ES: 65, Ch: 75
+  A: 80, Tr: 85, SF: 75, Att: 80, Comp: 85, Mod: 70, TM: 80
+  N: 30, Anx: 25, Ang: 30, Dep: 25, SC: 35, Immod: 35, V: 30
+  
+  # PRACTICAL SOFT SKILLS
+  [CookingSkills]:
+  1. Techniques (1a.Chopping→2a,3b 1b.Sautéing→2b,3a 1c.Baking→2c,3c)
+  2. Ingredients (2a.Selection→1a,3b 2b.Pairing→1b,3a 2c.Substitution→1c,3c) 
+  3. RecipeManagement (3a.Scaling→1b,2b 3b.Timing→1a,2a 3c.Adaptation→1c,2c)
+  
+  # COMPETENCE MAP - COGNITION
+  This map outlines the assistant's culinary knowledge and problem-solving skills.
+  
+  [CulinaryKnowledge]: 
+  1. RecipeUnderstanding (1a.Ingredients→2a 1b.Methods→2b) 
+  2. TechniqueApplication (1a.Cooking→3a 1b.Preparation→3b) 
+  3. TroubleShooting (1a.FixingDishes→1a 1b.Substitutions→1b)
+  
+  # COMPETENCE MAP - CHARM
+  This map shows how the assistant engages users with culinary enthusiasm.
+  
+  [CulinaryCharm]: 
+  1. Encouragement (1a.PositiveFeedback→2a 1b.MotivationalTips→2b) 
+  2. Engagement (1a.CookingStories→3a 1b.FunFacts→3b) 
+  3. Inspiration (1a.CreativeIdeas→1a 1b.SeasonalSuggestions→1b)
+  
+  Make sure to always provide grammatically correct responses.`;
+  const TypingAnimation = () => (
+    <View style={styles.typingContainer}>
+      <ActivityIndicator size="small" color={Colors.light.black} />
+      <Text style={styles.typingText}>Typing...</Text>
+    </View>
+  );
+
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      "keyboardWillShow",
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const keyboardWillHideListener = Keyboard.addListener(
+      "keyboardWillHide",
+      () => setKeyboardHeight(0)
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (message.trim() === "") return;
+
+    const newMessages = [
+      ...messages.slice(-9),
+      { type: "user" as const, content: message },
+    ];
+    setMessages(newMessages);
+    setInputPlaceholder("Message...");
+    setIsTyping(true);
+    scrollToBottom();
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...newMessages.map((msg) => ({
+              role: msg.type === "user" ? "user" : "assistant",
+              content: msg.content,
+            })),
+          ],
+          model: "tiiuae/falcon-180B-chat",
+          stream: true,
+          max_tokens: 1280,
+          temperature: 0,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { type: "bot" as const, content: data.content },
+        ]);
+      } else {
+        setIsTyping(false);
+        console.error("Error:", response.statusText);
+      }
+    } catch (error) {
+      setIsTyping(false);
+      console.error("Error:", error);
+    }
+  };
+
+  const handleClearConversation = () => {
+    setMessages([]);
+    setInputPlaceholder("Ask CookingBot a question");
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <YummyLogo />
+          </View>
+          <View style={styles.titleContainer}>
+            <View>
+              <Text style={styles.title}>CookingBot</Text>
+              <Text style={styles.subtitle}>Ask me anything</Text>
+            </View>
+            {messages.length > 0 && (
+              <ClearConversationButton onPress={handleClearConversation} />
+            )}
+          </View>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messageContainer}
+            contentContainerStyle={styles.messageContentContainer}
+          >
+            {messages.map((message, index) =>
+              message.type === "user" ? (
+                <ChatMessage key={index} message={message.content} />
+              ) : (
+                <ModelResponse key={index} response={message.content} />
+              )
+            )}
+            {isTyping && <TypingAnimation />}
+          </ScrollView>
+        </View>
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              marginBottom: keyboardHeight
+                ? moderateScale(20)
+                : moderateScale(77),
+            },
+          ]}
+        >
+          <ChatbotInput
+            onSend={handleSendMessage}
+            placeholder={inputPlaceholder}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+
+export default CookingBot;
+
+

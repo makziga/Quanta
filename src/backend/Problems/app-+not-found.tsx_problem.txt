@@ -1,0 +1,9 @@
+{
+  "summary": "No security vulnerabilities were detected in the provided code and its components.",
+  "analysisResults": [
+    {
+      "mainFile": "app/+not-found.tsx",
+      "issues": []
+    }
+  ]
+}

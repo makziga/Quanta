@@ -1,0 +1,1133 @@
+Main File:
+Path: app/(tabs)/recipes.tsx
+Code:   StyleSheet,
+  Text,
+  View,
+  FlatList,
+  StatusBar,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Modal,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+const { width } = Dimensions.get("window");
+
+const RecipesScreen: React.FC = () => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showGeneratorForm, setShowGeneratorForm] = useState(false);
+  const slideAnim = useRef(new Animated.Value(width)).current;
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [userPreferences, setUserPreferences] = useState({
+    weightUnit: "Kilograms - kg",
+    liquidUnit: "Milliliter - ml",
+    temperatureUnit: "Celsius - °C",
+    allergies: [],
+  });
+  const { recipes, addRecipe, completeRecipe } = useRecipes();
+
+  useEffect(() => {
+    loadUserPreferences();
+  }, []);
+
+  const loadUserPreferences = async () => {
+    try {
+      const weightUnit =
+        (await AsyncStorage.getItem("weightUnit")) || "Kilograms - kg";
+      const liquidUnit =
+        (await AsyncStorage.getItem("liquidUnit")) || "Milliliter - ml";
+      const temperatureUnit =
+        (await AsyncStorage.getItem("temperatureUnit")) || "Celsius - °C";
+      const allergies = JSON.parse(
+        (await AsyncStorage.getItem("allergies")) || "[]"
+      );
+
+      setUserPreferences({
+        weightUnit,
+        liquidUnit,
+        temperatureUnit,
+        allergies,
+      });
+    } catch (error) {
+      console.error("Failed to load user preferences", error);
+    }
+  };
+
+  const handleGenerateRecipe = useCallback(
+    (newRecipe: Recipe) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        addRecipe(newRecipe);
+        console.log("New recipe added:", newRecipe);
+      } catch (err) {
+        console.error("Error adding new recipe:", err);
+        setError("Failed to add new recipe. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [addRecipe]
+  );
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedRecipe(null);
+  };
+
+  const handleRecipeComplete = (completedRecipe: Recipe) => {
+    completeRecipe(completedRecipe);
+    handleCloseModal();
+  };
+
+  const handleRecipePress = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setModalVisible(true);
+  };
+
+  const handleRecipeGeneratorPress = () => {
+    setShowGeneratorForm(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCloseGeneratorForm = () => {
+    Animated.timing(slideAnim, {
+      toValue: width,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowGeneratorForm(false));
+  };
+
+  const handleGenerateFromForm = useCallback(
+    async (formData: any) => {
+      setShowGeneratorForm(false);
+      setIsGenerating(true);
+      setError(null);
+      try {
+        let recipeIdea = `${formData.dishDescription}`;
+        if (formData.mealType) recipeIdea += ` for ${formData.mealType}`;
+        if (formData.dietType) recipeIdea += `, ${formData.dietType}`;
+        if (formData.cookingMethod)
+          recipeIdea += `, using ${formData.cookingMethod}`;
+        if (formData.preparationTime)
+          recipeIdea += `, ${formData.preparationTime} preparation time`;
+        if (formData.skillLevel)
+          recipeIdea += `, ${formData.skillLevel} skill level`;
+        if (formData.servingSize)
+          recipeIdea += `, for ${formData.servingSize} servings`;
+        if (formData.flavorProfile.length > 0)
+          recipeIdea += `, with ${formData.flavorProfile.join(", ")} flavors`;
+        if (formData.nutritionalFocus)
+          recipeIdea += `, ${formData.nutritionalFocus}`;
+        if (formData.ingredientsToInclude)
+          recipeIdea += `, including ${formData.ingredientsToInclude}`;
+        if (formData.ingredientsToAvoid)
+          recipeIdea += `, avoiding ${formData.ingredientsToAvoid}`;
+
+        const response = await fetch(`${API_ENDPOINT}/generate_recipe`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ recipe_idea: recipeIdea }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.recipe) {
+          handleGenerateRecipe(data.recipe);
+        } else {
+          throw new Error(data.error || "Failed to generate recipe");
+        }
+      } catch (err) {
+        console.error("Error generating recipe:", err);
+        setError("Failed to generate recipe. Please try again.");
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [handleGenerateRecipe]
+  );
+
+  const renderHeader = () => (
+    <View style={styles.logoContainer}>
+      <YummyLogo />
+    </View>
+  );
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <Text style={styles.title}>Recipes</Text>
+      <Text style={styles.subtitle}>Access various recipes</Text>
+      <ChatbotInput
+        onGenerateRecipe={handleGenerateRecipe}
+        placeholder="What do you want to eat?"
+        userPreferences={userPreferences}
+      />
+      <RecipeGenerator onPress={handleRecipeGeneratorPress} />
+      {isLoading && (
+        <ActivityIndicator
+          size="large"
+          color={Colors.light.mainOrange}
+          style={styles.loader}
+        />
+      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      <RecentRecipes recipes={recipes} onRecipePress={handleRecipePress} />
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
+      />
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={[{ key: "content" }]}
+        renderItem={renderContent}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={styles.listContent}
+        extraData={recipes}
+      />
+      {selectedRecipe && (
+        <RecipeModal
+          visible={modalVisible}
+          onClose={handleCloseModal}
+          recipe={selectedRecipe}
+          onComplete={handleRecipeComplete}
+        />
+      )}
+      <Modal
+        visible={showGeneratorForm}
+        animationType="slide"
+        transparent={false}
+        statusBarTranslucent={true}
+        onRequestClose={handleCloseGeneratorForm}
+      >
+        <RecipeGeneratorForm
+          onGenerate={handleGenerateFromForm}
+          onClose={handleCloseGeneratorForm}
+        />
+      </Modal>
+      {isGenerating && (
+        <GeneratingModal
+          visible={isGenerating}
+          onCancel={() => setIsGenerating(false)}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
+export default RecipesScreen;
+
+
+Files used in this main file:
+components/recipes/ChatbotInput.tsx:   View,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Alert,
+  Text,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+interface ExtendedChatbotInputProps extends ChatbotInputPropsRecipe {
+  userPreferences: UserPreferences;
+}
+
+const ChatbotInput: React.FC<ExtendedChatbotInputProps> = ({
+  onGenerateRecipe,
+  value,
+  onChangeText,
+  onSend,
+  placeholder = "What do you want to eat?",
+  userPreferences,
+}) => {
+  const [recipeIdea, setRecipeIdea] = useState(value || "");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerateRecipe = async (recipeIdea: string) => {
+    if (recipeIdea.trim() === "") {
+      Alert.alert("Error", "Please enter a recipe idea");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/generate_recipe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipe_idea: recipeIdea,
+          user_preferences: userPreferences,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.recipe) {
+        setTimeout(() => {
+          onGenerateRecipe(data.recipe as Recipe);
+          setRecipeIdea("");
+          if (onChangeText) onChangeText("");
+          setIsGenerating(false);
+        }, 1);
+      } else {
+        throw new Error(data.error || "Failed to generate recipe");
+      }
+    } catch (error) {
+      console.error("Error generating recipe:", error);
+      const errorMessage =
+        (error as Error).message || "Failed to generate recipe";
+      setError(errorMessage);
+      setIsGenerating(false);
+    }
+  };
+
+  const getUserPreferences = async () => {
+    try {
+      const weightUnit =
+        (await AsyncStorage.getItem("weightUnit")) || "Kilograms - kg";
+      const liquidUnit =
+        (await AsyncStorage.getItem("liquidUnit")) || "Milliliter - ml";
+      const temperatureUnit =
+        (await AsyncStorage.getItem("temperatureUnit")) || "Celsius - °C";
+      const allergies = JSON.parse(
+        (await AsyncStorage.getItem("allergies")) || "[]"
+      );
+
+      return {
+        weightUnit,
+        liquidUnit,
+        temperatureUnit,
+        allergies: allergies.join(", "),
+      };
+    } catch (error) {
+      console.error("Failed to get user preferences", error);
+      return {};
+    }
+  };
+
+  const handleChangeText = (text: string) => {
+    setRecipeIdea(text);
+    if (onChangeText) onChangeText(text);
+  };
+
+  const handleSend = () => {
+    if (onSend) onSend(recipeIdea);
+    handleGenerateRecipe(recipeIdea);
+  };
+
+  const handleCancel = () => {
+    setIsGenerating(false);
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        placeholder={placeholder}
+        placeholderTextColor={Colors.light.lightGray}
+        value={recipeIdea}
+        onChangeText={handleChangeText}
+      />
+      <TouchableOpacity
+        onPress={() => handleGenerateRecipe(recipeIdea)}
+        disabled={isGenerating}
+      >
+        <LinearGradient
+          colors={isGenerating ? Gradients.main : Gradients.main}
+          style={styles.button}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Ionicons
+            name={isGenerating ? "hourglass" : "arrow-forward"}
+            size={Platform.OS === "ios" ? 24 : 19}
+            color="white"
+          />
+        </LinearGradient>
+      </TouchableOpacity>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      <GeneratingModal visible={isGenerating} onCancel={handleCancel} />
+    </View>
+  );
+};
+
+
+export default ChatbotInput;
+
+components/recipes/RecipeModal.tsx:   View,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  Text,
+  Image,
+  ScrollView,
+  Platform,
+  Dimensions,
+} from "react-native";
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  runOnJS,
+} from "react-native-reanimated";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+interface RecipeModalProps {
+  visible: boolean;
+  onClose: () => void;
+  recipe: Recipe;
+  onComplete: (recipe: Recipe) => void;
+}
+
+const RecipeModal: React.FC<RecipeModalProps> = ({
+  visible,
+  onClose,
+  recipe,
+  onComplete,
+}) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [showDirections, setShowDirections] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const slideAnim = useSharedValue(SCREEN_WIDTH);
+
+  const animateClose = useCallback(() => {
+    slideAnim.value = withTiming(
+      SCREEN_WIDTH,
+      {
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      },
+      (finished) => {
+        if (finished) {
+          runOnJS(setModalVisible)(false);
+          runOnJS(onClose)();
+        }
+      }
+    );
+  }, [slideAnim, onClose]);
+
+  useEffect(() => {
+    if (visible) {
+      setModalVisible(true);
+      slideAnim.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+    }
+  }, [visible, slideAnim]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideAnim.value }],
+  }));
+
+  const handleComplete = useCallback(() => {
+    onComplete(recipe);
+  }, [recipe, onComplete]);
+
+  const handleGetDirections = () => {
+    setShowDirections(true);
+    setCurrentStep(0);
+  };
+
+  const handleBackToInfo = () => {
+    setShowDirections(false);
+  };
+
+  const handleNextStep = () => {
+    if (currentStep < recipe.directions.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      animateClose();
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    } else {
+      handleBackToInfo();
+    }
+  };
+
+  const handleStepSelect = (step: number) => {
+    setCurrentStep(step);
+  };
+
+  return (
+    <Modal
+      transparent
+      visible={modalVisible}
+      onRequestClose={animateClose}
+      animationType="none"
+    >
+      <Animated.View style={[styles.modalContainer, animatedStyle]}>
+        <Image source={{ uri: recipe.image }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={animateClose}>
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={Colors.light.background}
+          />
+        </TouchableOpacity>
+        <View style={styles.contentWrapper}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            {!showDirections ? (
+              <RecipeInfo
+                recipe={recipe}
+                onGetDirections={handleGetDirections}
+              />
+            ) : (
+              <DirectionSteps
+                steps={recipe.directions}
+                currentStep={currentStep}
+                onBack={handlePreviousStep}
+                onNext={handleNextStep}
+                onStepSelect={handleStepSelect}
+              />
+            )}
+          </ScrollView>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              onPress={
+                !showDirections
+                  ? handleGetDirections
+                  : currentStep === recipe.directions.length - 1
+                  ? handleComplete
+                  : handleNextStep
+              }
+            >
+              <LinearGradient
+                colors={Gradients.main}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.button}
+              >
+                <Text style={styles.buttonText}>
+                  {!showDirections
+                    ? "Get Directions"
+                    : currentStep === recipe.directions.length - 1
+                    ? "Complete Recipe"
+                    : "Next Step"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+
+export default RecipeModal;
+
+components/recipes/RecentRecipes.tsx:   View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface RecentRecipesProps {
+  recipes: Recipe[];
+  onRecipePress: (recipe: Recipe) => void;
+  onViewAll?: () => void;
+}
+
+const RecipeItem: React.FC<{
+  recipe: Recipe;
+  onPress: (recipe: Recipe) => void;
+}> = ({ recipe, onPress }) => {
+  const handlePress = () => {
+    onPress(recipe);
+  };
+
+  return (
+    <TouchableOpacity style={styles.recipeItem} onPress={handlePress}>
+      <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
+      <Text style={styles.recipeTitle} numberOfLines={1} ellipsizeMode="tail">
+        {recipe.title}
+      </Text>
+
+      <Text
+        style={styles.recipeDescription}
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
+        {recipe.description}
+      </Text>
+
+      <View style={styles.metaInfo}>
+        <MetaItem icon="time-outline" text={`${recipe.time} min`} />
+        <MetaItem icon="flame-outline" text={`${recipe.calories} Cal`} />
+        <MetaItem icon="speedometer-outline" text={recipe.difficulty} />
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const MetaItem: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+}> = ({ icon, text }) => (
+  <View style={styles.metaItem}>
+    <Ionicons name={icon} size={12} color={Colors.light.mainOrange} />
+    <Text style={styles.metaText}>{text}</Text>
+  </View>
+);
+
+const RecentRecipes: React.FC<RecentRecipesProps> = ({
+  recipes,
+  onRecipePress,
+  onViewAll,
+}) => {
+  if (recipes.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Recent Recipes</Text>
+        <Text style={styles.noRecipesText}>
+          No recipes available. Generate your first recipe!
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Recent Recipes</Text>
+        {onViewAll && (
+          <TouchableOpacity onPress={onViewAll}>
+            <Text style={styles.viewAllButton}>View All</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <FlatList
+        data={recipes}
+        renderItem={({ item }) => (
+          <RecipeItem recipe={item} onPress={onRecipePress} />
+        )}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
+
+export default RecentRecipes;
+
+components/recipes/RecipeGenerator.tsx: 
+
+const RecipeGenerator: React.FC<RecipeGeneratorProps> = ({ onPress }) => (
+  <View style={styles.container}>
+    <Text style={styles.title}>You don't know what to eat?</Text>
+    <Text style={styles.subtitle}>We'll craft a recipe using your ideas!</Text>
+    <TouchableOpacity onPress={onPress}>
+      <LinearGradient
+        colors={Gradients.main}
+        style={styles.button}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
+        <Text style={styles.buttonText}>Generate Recipe</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </View>
+);
+
+
+export default RecipeGenerator;
+constants/Colors.ts: /**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const mainOrange = '#FE7C22';
+const lightOrange = '#FFAE00';
+const lightPeach = '#FFF2E9';
+const black = '#101720';
+const darkGray = '#959595';
+const lightGray = '#BBBBBB';
+const white = '#FFFFFF';
+const back = "#f7f7f9"
+export const Colors = {
+  light: {
+    text: black,
+    background: back,
+    cont: white,
+    tint: mainOrange,
+    icon: darkGray,
+    tabIconDefault: lightGray,
+    tabIconSelected: mainOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+  dark: {
+    text: '#ECEDEE',
+    background: black,
+    tint: lightOrange,
+    icon: lightGray,
+    tabIconDefault: darkGray,
+    tabIconSelected: lightOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+};
+
+
+export const Gradients = {
+  main: [mainOrange, lightOrange],
+};
+
+export const Shadows = {
+  main: {
+    shadowColor: black,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+};
+components/recipes/RecipeGeneratorForm.tsx:   View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface RecipeGeneratorFormProps {
+  onGenerate: (formData: any) => void;
+  onClose: () => void;
+}
+
+const RecipeGeneratorForm: React.FC<RecipeGeneratorFormProps> = ({
+  onGenerate,
+  onClose,
+}) => {
+  const [formData, setFormData] = useState({
+    dishDescription: "",
+    mealType: "",
+    dietType: "",
+    cookingMethod: "",
+    preparationTime: "",
+    skillLevel: "",
+    servingSize: "",
+    flavorProfile: "",
+    nutritionalFocus: "",
+    ingredientsToInclude: "",
+    ingredientsToAvoid: "",
+  });
+
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
+    weightUnit: "Kilograms - kg",
+    liquidUnit: "Milliliter - ml",
+    temperatureUnit: "Celsius - °C",
+    allergies: [],
+  });
+
+  useEffect(() => {
+    getUserPreferences();
+  }, []);
+
+  const getUserPreferences = async () => {
+    try {
+      const weightUnit =
+        (await AsyncStorage.getItem("weightUnit")) || "Kilograms - kg";
+      const liquidUnit =
+        (await AsyncStorage.getItem("liquidUnit")) || "Milliliter - ml";
+      const temperatureUnit =
+        (await AsyncStorage.getItem("temperatureUnit")) || "Celsius - °C";
+      const allergies = JSON.parse(
+        (await AsyncStorage.getItem("allergies")) || "[]"
+      );
+
+      setUserPreferences({
+        weightUnit,
+        liquidUnit,
+        temperatureUnit,
+        allergies,
+      });
+    } catch (error) {
+      console.error("Failed to get user preferences", error);
+    }
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData((prevData) => ({ ...prevData, [field]: value }));
+  };
+
+  const handleGenerate = () => {
+    const dataWithPreferences = {
+      ...formData,
+      userPreferences: {
+        ...userPreferences,
+        allergies: userPreferences.allergies.join(", "),
+      },
+    };
+    onGenerate(dataWithPreferences);
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.backButton}>
+              <Ionicons
+                name="arrow-back"
+                size={28}
+                color={Colors.light.black}
+              />
+            </TouchableOpacity>
+            <Text style={styles.title}>Generate Recipe</Text>
+          </View>
+          <ScrollView
+            style={styles.formContainer}
+            contentContainerStyle={styles.formContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TextInputField
+              label="Dish Description"
+              value={formData.dishDescription}
+              onChangeText={(text) =>
+                handleInputChange("dishDescription", text)
+              }
+              placeholder="What do you want to eat?"
+              required
+            />
+            <SingleChoiceField
+              label="Meal Type"
+              options={[
+                "Breakfast",
+                "Lunch",
+                "Dinner",
+                "Snack",
+                "Dessert",
+                "Other",
+              ]}
+              selectedOption={formData.mealType}
+              onSelect={(option) => handleInputChange("mealType", option)}
+              required
+            />
+            <SingleChoiceField
+              label="Diet Type"
+              options={[
+                "Regular",
+                "Vegetarian",
+                "Vegan",
+                "Pescatarian",
+                "Keto",
+                "Paleo",
+                "Gluten-free",
+                "Dairy-free",
+              ]}
+              selectedOption={formData.dietType}
+              onSelect={(option) => handleInputChange("dietType", option)}
+              required
+            />
+            <SingleChoiceField
+              label="Cooking Method"
+              options={[
+                "Baking",
+                "Grilling",
+                "Frying",
+                "Roasting",
+                "Slow cooking",
+                "Pressure cooking",
+                "Steaming",
+                "Stir-frying",
+              ]}
+              selectedOption={formData.cookingMethod}
+              onSelect={(option) => handleInputChange("cookingMethod", option)}
+            />
+            <SingleChoiceField
+              label="Preparation Time"
+              options={[
+                "Quick (under 30 minutes)",
+                "Medium (30-60 minutes)",
+                "Long (over 60 minutes)",
+              ]}
+              selectedOption={formData.preparationTime}
+              onSelect={(option) =>
+                handleInputChange("preparationTime", option)
+              }
+            />
+            <SingleChoiceField
+              label="Skill Level"
+              options={["Beginner", "Intermediate", "Advanced"]}
+              selectedOption={formData.skillLevel}
+              onSelect={(option) => handleInputChange("skillLevel", option)}
+            />
+            <TextInputField
+              label="Serving Size"
+              value={formData.servingSize}
+              onChangeText={(text) => handleInputChange("servingSize", text)}
+              placeholder="How many servings do you want"
+            />
+            {/*  <SingleChoiceField
+              label="Flavor Profile"
+              options={["Spicy", "Sweet", "Savory", "Tangy", "Umami"]}
+              selectedOption={formData.flavorProfile}
+              onSelect={(options) =>
+                handleInputChange("flavorProfile", options)
+              }
+            /> */}
+            <SingleChoiceField
+              label="Nutritional Focus"
+              options={["High-protein", "Low-carb", "Low-fat", "High-fiber"]}
+              selectedOption={formData.nutritionalFocus}
+              onSelect={(option) =>
+                handleInputChange("nutritionalFocus", option)
+              }
+            />
+            <TextInputField
+              label="Ingredients to Include"
+              value={formData.ingredientsToInclude}
+              onChangeText={(text) =>
+                handleInputChange("ingredientsToInclude", text)
+              }
+              placeholder="List specific ingredients you want to use"
+            />
+            <TextInputField
+              label="Ingredients to Avoid"
+              value={formData.ingredientsToAvoid}
+              onChangeText={(text) =>
+                handleInputChange("ingredientsToAvoid", text)
+              }
+              placeholder="List ingredients you don't want in the recipe"
+            />
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={handleGenerate}
+          >
+            <Text style={styles.generateButtonText}>Generate Recipe</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+
+export default RecipeGeneratorForm;
+
+components/YummyLogo.tsx: 
+
+interface YummyLogoProps {
+  style?: ImageStyle;
+}
+
+const YummyLogo: React.FC<YummyLogoProps> = ({ style }) => (
+  <Image
+    source={require('@/assets/images/yummy-logo.png')}
+    style={[styles.logo, style]}
+    resizeMode="contain"
+  />
+);
+
+
+export default YummyLogo;
+components/recipes/GeneratingModal.tsx: 
+
+  Modal,
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+
+interface GeneratingModalProps {
+  visible: boolean;
+  onCancel: () => void;
+}
+
+const GeneratingModal: React.FC<GeneratingModalProps> = ({
+  visible,
+  onCancel,
+}) => {
+  return (
+    <Modal transparent visible={visible} animationType="fade">
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalText}>Wait, generating...</Text>
+          <ActivityIndicator
+            size="large"
+            color={Colors.light.mainOrange}
+            style={styles.spinner}
+          />
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+
+export default GeneratingModal;
+
+context/RecipesContext.tsx:   createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+
+interface RecipesContextType {
+  recipes: Recipe[];
+  addRecipe: (newRecipe: Recipe) => void;
+  completeRecipe: (completedRecipe: Recipe) => void;
+  clearAllRecipes: () => void; // Add this new method
+}
+
+const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
+
+export const RecipesProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, []);
+
+  const loadRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+      if (storedRecipes) {
+        setRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error("Failed to load recipes", error);
+    }
+  };
+
+  const saveRecipes = async (updatedRecipes: Recipe[]) => {
+    try {
+      await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error("Failed to save recipes", error);
+    }
+  };
+
+  const addRecipe = (newRecipe: Recipe) => {
+    const updatedRecipes = [newRecipe, ...recipes];
+    saveRecipes(updatedRecipes);
+  };
+
+  const completeRecipe = (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    saveRecipes(updatedRecipes);
+  };
+
+  const clearAllRecipes = async () => {
+    try {
+      await AsyncStorage.removeItem("recipes");
+      setRecipes([]);
+    } catch (error) {
+      console.error("Failed to clear recipes", error);
+    }
+  };
+
+  return (
+    <RecipesContext.Provider
+      value={{ recipes, addRecipe, completeRecipe, clearAllRecipes }}
+    >
+      {children}
+    </RecipesContext.Provider>
+  );
+};
+
+export const useRecipes = () => {
+  const context = useContext(RecipesContext);
+  if (context === undefined) {
+    throw new Error("useRecipes must be used within a RecipesProvider");
+  }
+  return context;
+};
+
+constants/responsive.ts: 
+const { width, height } = Dimensions.get('window');
+
+const guidelineBaseWidth = 390;
+const guidelineBaseHeight = 844;
+
+const scaleFactor = Platform.OS === 'ios' ? 1 : 0;
+
+export const horizontalScale = (size: number) => (width / guidelineBaseWidth) * size;
+export const verticalScale = (size: number) => (height / guidelineBaseHeight) * size
+export const moderateScale = (size: number, factor = 0.5) => {
+  const platformFactor = Platform.OS === 'ios' ? factor : factor * 0.8;
+  return size + (horizontalScale(size) - size) * platformFactor;
+};
+
+

@@ -1,0 +1,44 @@
+Main File:
+Path: backend/image_generator.py
+Code: 
+load_dotenv()
+
+AI71_API_KEY = os.getenv("AI71_API_KEY")
+ai71_client = AI71(AI71_API_KEY)
+
+def generate_image_url(recipe_title):
+    prompt = (
+        "You will now act as an image generator. I will describe an image to you, and you will create a URL with a description of my input. "
+        "You will output ONLY in this URL format: "
+        "https://image.pollinations.ai/prompt/{description}?width=512&height=512&nofeed=true&nologo=True "
+        "Since each input is about food, you will always place the food on a white plate. Here is one example: "
+        "\"https://image.pollinations.ai/prompt/A%20delicious%20and%20creamy%20chicken%20salad%20perfect%20for%20a%20light%20lunch%20or%20dinner%20on%20white%20plate?width=512&height=512&nofeed=true&nologo=True\" "
+        "Make sure to provide a more detailed description of the image. For example, if the user provides a simple food item, you will expand the description and make it more detailed. "
+        "Always place the food on a white plate. You MUST provide other details of food too. For example if it is simple food, provide like details of other parts of that food that are on the image like ingredients or something like that. You MUST be detailed. "
+        f"Here is user's input: {recipe_title}. Remember that you MUST provide full url including https:// and all the parameters without ANY comments or extra text. JUST the URL."
+    )
+    
+    try:
+        response = ai71_client.chat.completions.create(
+            model="tiiuae/falcon-180B-chat",
+            messages=[
+                {"role": "system", "content": "You are an AI that generates image URLs for recipes."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=200,
+            temperature=0.7
+        )
+        
+        image_url = response.choices[0].message.content.strip()
+        print(f"Generated image URL for {recipe_title}: {image_url}")
+
+        parsed_url = urllib.parse.urlparse(image_url)
+        encoded_path = urllib.parse.quote(parsed_url.path)
+        final_url = parsed_url._replace(path=encoded_path).geturl()
+        
+        return final_url
+    except Exception as e:
+        print(f"Error generating image URL: {str(e)}")
+        return ""
+
+Files used in this main file:

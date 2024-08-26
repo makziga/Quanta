@@ -1,0 +1,118 @@
+Title of the problem is: Sensitive Data Exposure. Here is the description of the problem: The currentDayData is logged to the console using console.log. This can expose sensitive information about the user's meal plan, including dates and meal details.
+And here are the codes where this problem is appearing:
+components/planner/MealPlanModal.tsx:
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  SafeAreaView,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+interface MealPlanModalProps {
+  visible: boolean;
+  onClose: () => void;
+  mealPlan: MealPlan;
+}
+
+const MealPlanModal: React.FC<MealPlanModalProps> = ({
+  visible,
+  onClose,
+  mealPlan,
+}) => {
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [recipeModalVisible, setRecipeModalVisible] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [currentDayData, setCurrentDayData] = useState<Day | null>(null);
+
+  useEffect(() => {
+    if (mealPlan && mealPlan.mealPlan.days[selectedDay]) {
+      setCurrentDayData(mealPlan.mealPlan.days[selectedDay]);
+    }
+  }, [mealPlan, selectedDay]);
+
+  const handleDaySelect = (day: number) => {
+    console.log(`Selecting day: ${day}`);
+    setSelectedDay(day);
+  };
+
+  const handleRecipePress = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setRecipeModalVisible(true);
+  };
+
+  const handleRecipeComplete = (recipe: Recipe) => {
+    setRecipeModalVisible(false);
+  };
+
+  console.log(`Current day data:`, currentDayData);
+
+  if (!currentDayData) {
+    return null;
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.light.black} />
+          </TouchableOpacity>
+          <Text style={styles.headerText}>Back to Saved Plans</Text>
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {`${mealPlan.mealPlan.days.length}-Day Meal Plan`}
+          </Text>
+          <Text style={styles.subtitle}>
+            {`${mealPlan.mealPlan.days.length} days | ${
+              Object.keys(currentDayData.meals).length
+            } meals per day`}
+          </Text>
+          <DaySelector
+            days={mealPlan.mealPlan.days.map((day, index) => ({
+              dayOfWeek: `Day ${index + 1}`,
+              date: day.date,
+            }))}
+            selectedDay={selectedDay}
+            onDaySelect={handleDaySelect}
+          />
+          <ScrollView style={styles.mealsContainer}>
+            {Object.entries(currentDayData.recipes).map(
+              ([mealType, recipe]) => (
+                <View key={`${currentDayData.date}-${mealType}`}>
+                  <Text style={styles.mealTypeTitle}>{mealType}</Text>
+                  <MealItem
+                    meal={{
+                      type: mealType,
+                      recipe: recipe,
+                    }}
+                    onPress={() => handleRecipePress(recipe)}
+                  />
+                </View>
+              )
+            )}
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+      {selectedRecipe && (
+        <RecipeModal
+          visible={recipeModalVisible}
+          onClose={() => setRecipeModalVisible(false)}
+          recipe={selectedRecipe}
+          onComplete={handleRecipeComplete}
+        />
+      )}
+    </Modal>
+  );
+};
+
+
+export default MealPlanModal;
+
+

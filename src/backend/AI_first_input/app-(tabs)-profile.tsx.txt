@@ -1,0 +1,442 @@
+Main File:
+Path: app/(tabs)/profile.tsx
+Code:   View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Platform,
+  StatusBar,
+  ScrollView,
+  Alert,
+  TextInput,
+  Modal,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+interface SettingsButtonProps {
+  title: string;
+  value: string;
+  onPress: () => void;
+}
+
+const SettingsButton: React.FC<SettingsButtonProps> = ({
+  title,
+  value,
+  onPress,
+}) => (
+  <View style={styles.settingsItem}>
+    <Text style={styles.settingsTitle}>{title}</Text>
+    <TouchableOpacity style={styles.settingsButton} onPress={onPress}>
+      <Text style={styles.settingsButtonText}>{value}</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ onSignOut }) => {
+  const [weightUnit, setWeightUnit] = useState<string>("Kilograms - kg");
+  const [liquidUnit, setLiquidUnit] = useState<string>("Milliliter - ml");
+  const [temperatureUnit, setTemperatureUnit] =
+    useState<string>("Celsius - °C");
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [allergyInput, setAllergyInput] = useState<string>("");
+  const { clearAllRecipes } = useRecipes();
+  const [isAllergyModalVisible, setIsAllergyModalVisible] =
+    useState<boolean>(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const storedWeightUnit = await AsyncStorage.getItem("weightUnit");
+      const storedLiquidUnit = await AsyncStorage.getItem("liquidUnit");
+      const storedTemperatureUnit = await AsyncStorage.getItem(
+        "temperatureUnit"
+      );
+      const storedAllergies = await AsyncStorage.getItem("allergies");
+
+      if (storedWeightUnit) setWeightUnit(storedWeightUnit);
+      if (storedLiquidUnit) setLiquidUnit(storedLiquidUnit);
+      if (storedTemperatureUnit) setTemperatureUnit(storedTemperatureUnit);
+      if (storedAllergies) setAllergies(JSON.parse(storedAllergies));
+    } catch (error) {
+      console.error("Failed to load settings", error);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      await AsyncStorage.setItem("weightUnit", weightUnit);
+      await AsyncStorage.setItem("liquidUnit", liquidUnit);
+      await AsyncStorage.setItem("temperatureUnit", temperatureUnit);
+      await AsyncStorage.setItem("allergies", JSON.stringify(allergies));
+    } catch (error) {
+      console.error("Failed to save settings", error);
+    }
+  };
+
+  const handleSignOut = () => {
+    onSignOut();
+    console.log("Sign out pressed");
+  };
+
+  const handleClearRecipes = async () => {
+    Alert.alert(
+      "Clear All Recipes",
+      "Are you sure you want to clear all recipes? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await clearAllRecipes(); 
+              Alert.alert("Success", "All recipes have been cleared.");
+            } catch (error) {
+              console.error("Failed to clear recipes", error);
+              Alert.alert(
+                "Error",
+                "Failed to clear recipes. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const toggleSetting = (
+    currentValue: string,
+    options: string[],
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const currentIndex = options.indexOf(currentValue);
+    const nextIndex = (currentIndex + 1) % options.length;
+    setter(options[nextIndex]);
+    saveSettings();
+  };
+
+  const handleAddAllergy = () => {
+    if (allergyInput.trim()) {
+      setAllergies([...allergies, allergyInput.trim()]);
+      setAllergyInput("");
+      saveSettings();
+    }
+  };
+
+  const handleRemoveAllergy = (allergy: string) => {
+    setAllergies(allergies.filter((item) => item !== allergy));
+    saveSettings();
+  };
+
+  const generatePromptInfo = () => {
+    return `
+      User preferences:
+      - Weight unit: ${weightUnit}
+      - Liquid unit: ${liquidUnit}
+      - Temperature unit: ${temperatureUnit}
+      - Allergies: ${allergies.join(", ")}
+    `;
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <YummyLogo style={styles.logo} />
+        <Text style={styles.title}>Settings</Text>
+
+        <SettingsButton
+          title="Weight"
+          value={weightUnit}
+          onPress={() =>
+            toggleSetting(
+              weightUnit,
+              ["Kilograms - kg", "Pounds - lb"],
+              setWeightUnit
+            )
+          }
+        />
+
+        <SettingsButton
+          title="Liquid Volume"
+          value={liquidUnit}
+          onPress={() =>
+            toggleSetting(
+              liquidUnit,
+              ["Milliliter - ml", "Fluid Ounce - fl oz"],
+              setLiquidUnit
+            )
+          }
+        />
+
+        <SettingsButton
+          title="Temperature"
+          value={temperatureUnit}
+          onPress={() =>
+            toggleSetting(
+              temperatureUnit,
+              ["Celsius - °C", "Fahrenheit - °F"],
+              setTemperatureUnit
+            )
+          }
+        />
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setIsAllergyModalVisible(true)}
+        >
+          <Text style={styles.buttonText}>Manage Allergies</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={handleClearRecipes}>
+          <Text style={styles.buttonText}>Clear All Recipes</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={handleSignOut}>
+          <Text style={styles.buttonText}>Sign Out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => console.log(generatePromptInfo())}
+        >
+          <Text style={styles.buttonText}>Log Prompt Info</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <Modal
+        visible={isAllergyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsAllergyModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Manage Allergies</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={allergyInput}
+                onChangeText={setAllergyInput}
+                placeholder="Enter allergy"
+              />
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={handleAddAllergy}
+              >
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.allergyList}>
+              {allergies.map((allergy, index) => (
+                <View key={index} style={styles.allergyItem}>
+                  <Text style={styles.allergyText}>{allergy}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveAllergy(allergy)}
+                  >
+                    <Text style={styles.removeButton}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsAllergyModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+
+export default ProfileScreen;
+
+
+Files used in this main file:
+components/YummyLogo.tsx: 
+
+interface YummyLogoProps {
+  style?: ImageStyle;
+}
+
+const YummyLogo: React.FC<YummyLogoProps> = ({ style }) => (
+  <Image
+    source={require('@/assets/images/yummy-logo.png')}
+    style={[styles.logo, style]}
+    resizeMode="contain"
+  />
+);
+
+
+export default YummyLogo;
+constants/Colors.ts: /**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const mainOrange = '#FE7C22';
+const lightOrange = '#FFAE00';
+const lightPeach = '#FFF2E9';
+const black = '#101720';
+const darkGray = '#959595';
+const lightGray = '#BBBBBB';
+const white = '#FFFFFF';
+const back = "#f7f7f9"
+export const Colors = {
+  light: {
+    text: black,
+    background: back,
+    cont: white,
+    tint: mainOrange,
+    icon: darkGray,
+    tabIconDefault: lightGray,
+    tabIconSelected: mainOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+  dark: {
+    text: '#ECEDEE',
+    background: black,
+    tint: lightOrange,
+    icon: lightGray,
+    tabIconDefault: darkGray,
+    tabIconSelected: lightOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+};
+
+
+export const Gradients = {
+  main: [mainOrange, lightOrange],
+};
+
+export const Shadows = {
+  main: {
+    shadowColor: black,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+};
+context/RecipesContext.tsx:   createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+
+interface RecipesContextType {
+  recipes: Recipe[];
+  addRecipe: (newRecipe: Recipe) => void;
+  completeRecipe: (completedRecipe: Recipe) => void;
+  clearAllRecipes: () => void; // Add this new method
+}
+
+const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
+
+export const RecipesProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, []);
+
+  const loadRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+      if (storedRecipes) {
+        setRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error("Failed to load recipes", error);
+    }
+  };
+
+  const saveRecipes = async (updatedRecipes: Recipe[]) => {
+    try {
+      await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error("Failed to save recipes", error);
+    }
+  };
+
+  const addRecipe = (newRecipe: Recipe) => {
+    const updatedRecipes = [newRecipe, ...recipes];
+    saveRecipes(updatedRecipes);
+  };
+
+  const completeRecipe = (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    saveRecipes(updatedRecipes);
+  };
+
+  const clearAllRecipes = async () => {
+    try {
+      await AsyncStorage.removeItem("recipes");
+      setRecipes([]);
+    } catch (error) {
+      console.error("Failed to clear recipes", error);
+    }
+  };
+
+  return (
+    <RecipesContext.Provider
+      value={{ recipes, addRecipe, completeRecipe, clearAllRecipes }}
+    >
+      {children}
+    </RecipesContext.Provider>
+  );
+};
+
+export const useRecipes = () => {
+  const context = useContext(RecipesContext);
+  if (context === undefined) {
+    throw new Error("useRecipes must be used within a RecipesProvider");
+  }
+  return context;
+};
+
+constants/responsive.ts: 
+const { width, height } = Dimensions.get('window');
+
+const guidelineBaseWidth = 390;
+const guidelineBaseHeight = 844;
+
+const scaleFactor = Platform.OS === 'ios' ? 1 : 0;
+
+export const horizontalScale = (size: number) => (width / guidelineBaseWidth) * size;
+export const verticalScale = (size: number) => (height / guidelineBaseHeight) * size
+export const moderateScale = (size: number, factor = 0.5) => {
+  const platformFactor = Platform.OS === 'ios' ? factor : factor * 0.8;
+  return size + (horizontalScale(size) - size) * platformFactor;
+};
+
+

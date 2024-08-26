@@ -1,0 +1,720 @@
+Main File:
+Path: app/(tabs)/inventory.tsx
+Code:   View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  FlatList,
+  Platform,
+  StatusBar,
+} from "react-native";
+  useSharedValue,
+  useAnimatedScrollHandler,
+  interpolateColor,
+} from "react-native-reanimated";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+type CategoryType = "Type" | "Location";
+
+export default function InventoryScreen() {
+  const [categoryType, setCategoryType] = useState<CategoryType>("Type");
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [addNewModalVisible, setAddNewModalVisible] = useState(false);
+  const [selectedItemDetails, setSelectedItemDetails] =
+    useState<InventoryItem | null>(null);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(
+    inventoryData.items
+  );
+  const { setTotalItemCount } = useInventory();
+
+  const toggleCategoryType = () => {
+    setCategoryType((prev) => (prev === "Type" ? "Location" : "Type"));
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelecting((prev) => !prev);
+    setSelectedItems([]);
+  };
+
+  useEffect(() => {
+    const count = inventoryItems.length;
+    setTotalItemCount(count);
+  }, [inventoryItems, setTotalItemCount]);
+
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const updateItem = (updatedItem: InventoryItem) => {
+    setInventoryItems((prev) =>
+      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+    );
+    setSelectedItemDetails(updatedItem);
+  };
+
+  const handleItemPress = (item: InventoryItem) => {
+    if (isSelecting) {
+      toggleItemSelection(item.id);
+    } else {
+      setSelectedItemDetails(item);
+      setModalVisible(true);
+    }
+  };
+
+  const removeSelectedItems = () => {
+    setInventoryItems((prev) =>
+      prev.filter((item) => !selectedItems.includes(item.id))
+    );
+    setSelectedItems([]);
+    setIsSelecting(false);
+  };
+
+  const removeItem = (itemId: string) => {
+    setInventoryItems((prev) => prev.filter((item) => item.id !== itemId));
+    setModalVisible(false);
+  };
+  const handleAddNewItem = (newItem: InventoryItem) => {
+    setInventoryItems((prev) => [...prev, newItem]);
+    setAddNewModalVisible(false);
+  };
+  const groupedItems = inventoryItems.reduce((acc, item) => {
+    const key = categoryType === "Type" ? item.type : item.location;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(item);
+    return acc;
+  }, {} as Record<string, InventoryItem[]>);
+
+  const groupedItemsArray = Object.entries(groupedItems);
+
+  const scrollY = useSharedValue(0);
+  const headerBackgroundColor = useSharedValue(Colors.light.background);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+      headerBackgroundColor.value = interpolateColor(
+        scrollY.value,
+        [0, 50],
+        [Colors.light.background, Colors.light.background]
+      );
+    },
+  });
+
+  const renderCategorySection = useCallback(
+    ({ item }: { item: [string, InventoryItem[]] }) => {
+      const [category, items] = item;
+      return (
+        <CategorySection
+          category={category}
+          items={items}
+          onItemPress={handleItemPress}
+          isSelecting={isSelecting}
+          selectedItems={selectedItems}
+        />
+      );
+    },
+    [isSelecting, selectedItems, handleItemPress]
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <YummyLogo style={styles.logo} />
+        <Text style={styles.title}>Inventory</Text>
+        <Text style={styles.subtitle}>Add or modify your Groceries</Text>
+
+        <View style={styles.buttonContainer}>
+          <CategoryButton
+            onPress={toggleCategoryType}
+            categoryType={categoryType}
+          />
+          <AddNewButton onPress={() => setAddNewModalVisible(true)} />
+          <SelectButton onPress={toggleSelectMode} isSelecting={isSelecting} />
+        </View>
+
+        <View style={styles.listContainer}>
+          <TopBlur color={headerBackgroundColor} />
+          <Animated.FlatList
+            data={groupedItemsArray}
+            renderItem={renderCategorySection}
+            keyExtractor={(item) => item[0]}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+          />
+          <LinearGradient
+            colors={["rgba(255, 255, 255, 0)", Colors.light.background]}
+            style={styles.bottomGradient}
+          />
+        </View>
+
+        {isSelecting && <RemoveButton onPress={removeSelectedItems} />}
+
+        <ItemDetailsModal
+          visible={modalVisible}
+          item={selectedItemDetails}
+          onClose={() => setModalVisible(false)}
+          onUpdate={updateItem}
+          onRemove={removeItem}
+        />
+        <AddNewModal
+          isVisible={addNewModalVisible}
+          onClose={() => setAddNewModalVisible(false)}
+          onAddItem={handleAddNewItem}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+
+
+Files used in this main file:
+components/inventory/RemoveButton.tsx: 
+export const RemoveButton: React.FC<RemoveButtonProps> = ({ onPress, label = 'Remove' }) => (
+  <TouchableOpacity style={styles.button} onPress={onPress}>
+    <Text style={styles.text}>{label}</Text>
+  </TouchableOpacity>
+);
+
+
+export default RemoveButton;
+context/InventoryContext.tsx: 
+interface InventoryContextType {
+  totalItemCount: number;
+  setTotalItemCount: (count: number) => void;
+}
+
+const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
+
+interface InventoryProviderProps {
+  children: ReactNode;
+}
+
+export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }) => {
+  const [totalItemCount, setTotalItemCount] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.setItem('totalItemCount', totalItemCount.toString());
+  }, [totalItemCount]);
+
+  return (
+    <InventoryContext.Provider value={{ totalItemCount, setTotalItemCount }}>
+      {children}
+    </InventoryContext.Provider>
+  );
+};
+
+export const useInventory = () => {
+  const context = useContext(InventoryContext);
+  if (context === undefined) {
+    throw new Error('useInventory must be used within an InventoryProvider');
+  }
+  return context;
+};
+components/inventory/SelectButton.tsx: 
+export const SelectButton: React.FC<SelectButtonProps> = ({ onPress, isSelecting }) => (
+  <TouchableOpacity style={styles.button} onPress={onPress}>
+    <Text style={[styles.text, isSelecting && styles.selectingText]}>
+      {isSelecting ? 'Cancel' : 'Select'}
+    </Text>
+  </TouchableOpacity>
+);
+
+
+export default SelectButton;
+components/inventory/CategoryButton.tsx: 
+export const CategoryButton: React.FC<CategoryButtonProps> = ({ onPress, categoryType }) => (
+  <TouchableOpacity style={styles.button} onPress={onPress}>
+    <Text style={styles.text}>{`Category: ${categoryType}`}</Text>
+  </TouchableOpacity>
+);
+
+
+export default CategoryButton;
+components/inventory/ItemDetailsModal.tsx:   Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  runOnJS,
+} from "react-native-reanimated";
+  InventoryItemDetailsModalProps,
+  InventoryItem,
+  InfoItemProps,
+} from "@/types";
+
+export const ItemDetailsModal: React.FC<InventoryItemDetailsModalProps> = ({
+  visible,
+  item,
+  onClose,
+  onUpdate,
+  onRemove,
+}) => {
+  const [editedItem, setEditedItem] = useState<InventoryItem | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const slideAnim = useSharedValue(horizontalScale(390));
+
+  useEffect(() => {
+    if (visible) {
+      setModalVisible(true);
+      slideAnim.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+    } else {
+      slideAnim.value = withTiming(
+        horizontalScale(390),
+        {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        },
+        (finished) => {
+          if (finished) {
+            runOnJS(setModalVisible)(false);
+          }
+        }
+      );
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    setEditedItem(item);
+    setIsEditing(false);
+  }, [item]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideAnim.value }],
+  }));
+
+  const handleEdit = () => setIsEditing(true);
+
+  const handleSave = () => {
+    if (editedItem) {
+      onUpdate(editedItem);
+      setIsEditing(false);
+    }
+  };
+
+  const handleRemove = () => {
+    if (item) {
+      onRemove(item.id);
+    }
+  };
+
+  const handleInputChange = (field: keyof InventoryItem, value: string) => {
+    setEditedItem((prev) => {
+      if (!prev) return null;
+      if (field === "quantity") {
+        return { ...prev, [field]: parseInt(value) || 0 };
+      }
+      return { ...prev, [field]: value };
+    });
+  };
+
+  if (!item) return null;
+
+  return (
+    <Modal
+      transparent={true}
+      visible={modalVisible}
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <Animated.View style={[styles.modalContent, animatedStyle]}>
+          <ScrollView contentContainerStyle={styles.scrollViewContent}>
+            <TouchableOpacity style={styles.backButton} onPress={onClose}>
+              <Text style={styles.backButtonText}>←</Text>
+            </TouchableOpacity>
+            <View style={styles.emojiContainer}>
+              <Text style={styles.emoji}>{item.emoji}</Text>
+            </View>
+            <TextInput
+              style={[styles.nameInput, isEditing && styles.editingInput]}
+              value={editedItem?.name}
+              onChangeText={(text) => handleInputChange("name", text)}
+              editable={isEditing}
+              onSubmitEditing={handleSave}
+            />
+            <TextInput
+              style={[
+                styles.descriptionInput,
+                isEditing && styles.editingInput,
+              ]}
+              value={editedItem?.description}
+              onChangeText={(text) => handleInputChange("description", text)}
+              multiline
+              editable={isEditing}
+              onSubmitEditing={handleSave}
+            />
+            <View style={styles.infoContainer}>
+              <InfoItem
+                label="Type"
+                value={editedItem?.type || ""}
+                isEditing={isEditing}
+                onChangeText={(text: string) => handleInputChange("type", text)}
+                onSubmitEditing={handleSave}
+              />
+              <InfoItem
+                label="Location"
+                value={editedItem?.location || ""}
+                isEditing={isEditing}
+                onChangeText={(text: string) =>
+                  handleInputChange("location", text)
+                }
+                onSubmitEditing={handleSave}
+              />
+              <InfoItem
+                label="Quantity"
+                value={editedItem?.quantity.toString() || "0"}
+                isEditing={isEditing}
+                onChangeText={(text: string) =>
+                  handleInputChange("quantity", text)
+                }
+                onSubmitEditing={handleSave}
+                keyboardType="numeric"
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={isEditing ? handleSave : handleEdit}
+            >
+              <LinearGradient
+                colors={Gradients.main}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.editButtonGradient}
+              >
+                <Text style={styles.editButtonText}>
+                  {isEditing ? "Save Changes" : "Edit this Item"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={handleRemove}
+            >
+              <Text style={styles.removeButtonText}>Remove this Item</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const InfoItem: React.FC<InfoItemProps> = ({
+  label,
+  value,
+  isEditing,
+  onChangeText,
+  onSubmitEditing,
+  keyboardType = "default",
+}) => (
+  <View style={styles.infoItem}>
+    <Text style={styles.infoLabel}>{label}:</Text>
+    <TextInput
+      style={[
+        styles.infoInput,
+        isEditing ? styles.editingInput : styles.infoValue,
+      ]}
+      value={value}
+      onChangeText={onChangeText}
+      editable={isEditing}
+      onSubmitEditing={onSubmitEditing}
+      keyboardType={keyboardType}
+    />
+  </View>
+);
+
+
+components/inventory/CategorySection.tsx: 
+export const CategorySection: React.FC<CategorySectionProps> = ({ 
+  category, 
+  items, 
+  onItemPress, 
+  isSelecting, 
+  selectedItems 
+}) => (
+  <View style={styles.container}>
+    <Text style={styles.categoryTitle}>{category}</Text>
+    <View style={styles.itemsContainer}>
+      {items.map((item: InventoryItem) => (
+        <View key={item.id} style={styles.itemWrapper}>
+          <InventoryItemComponent
+            name={item.name}
+            emoji={item.emoji}
+            onPress={() => onItemPress(item)}
+            isSelected={isSelecting && selectedItems.includes(item.id)}
+          />
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
+
+export default CategorySection;
+components/inventory/AddNewModal.tsx: 
+
+type AddNewModalProps = {
+    isVisible: boolean;
+    onClose: () => void;
+    onAddItem: (item: InventoryItem) => void;
+  };
+
+  export const AddNewModal: React.FC<AddNewModalProps> = ({ isVisible, onClose, onAddItem }) => {
+    const [step, setStep] = useState<'choose' | 'manual' | 'detect' | 'confirm'>('choose');
+  const [selectedOption, setSelectedOption] = useState<'manual' | 'detect' | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const handleOptionSelect = (option: 'manual' | 'detect') => {
+    setSelectedOption(option);
+  };
+
+  const handleContinue = () => {
+    if (selectedOption === 'manual') {
+      setStep('manual');
+    } else if (selectedOption === 'detect') {
+      setStep('detect');
+    }
+  };
+
+  const handlePhotoSelect = (uri: string) => {
+    setPhotoUri(uri);
+    setStep('confirm');
+  };
+
+  const handleAddManually = (item: InventoryItem) => {
+    onAddItem(item);
+    onClose();
+  };
+
+  const handleConfirmPhoto = (item: InventoryItem) => {
+    onAddItem(item);
+    onClose();
+  };
+
+  useEffect(() => {
+    if (isVisible) {
+      setStep('choose');
+      setSelectedOption(null);
+      setPhotoUri(null);
+    }
+  }, [isVisible]);
+  
+  const pan = useRef(new Animated.ValueXY()).current;
+const panResponder = PanResponder.create({
+  onMoveShouldSetPanResponder: (_, gestureState) => {
+    return Math.abs(gestureState.dy) > 10;
+  },
+  onPanResponderMove: (_, gestureState) => {
+    if (gestureState.dy > 0) {
+      Animated.event([null, { dy: pan.y }], { useNativeDriver: false })(_, gestureState);
+    }
+  },
+  onPanResponderRelease: (_, gestureState) => {
+    if (gestureState.dy > 100) {
+      onClose();
+    } else {
+      Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+    }
+  },
+});
+if (!isVisible) return null;
+
+  return (
+    <Animated.View
+  style={[styles.modalContent, { transform: [{ translateY: pan.y }] }]}
+  {...panResponder.panHandlers}>
+
+    <Modal
+      transparent
+      visible={isVisible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.modalContent}>
+              {step === 'choose' && (
+                <ChooseOptionModal
+                  selectedOption={selectedOption}
+                  onOptionSelect={handleOptionSelect}
+                  onContinue={handleContinue}
+                />
+              )}
+              {step === 'manual' && (
+                <AddManuallyModal onAddItem={handleAddManually} />
+              )}
+              {step === 'detect' && (
+                <DetectByPhotoModal onPhotoSelect={handlePhotoSelect} />
+              )}
+              {step === 'confirm' && photoUri && (
+                <PhotoConfirmModal
+                  photoUri={photoUri}
+                  onConfirm={handleConfirmPhoto}
+                />
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+    </Animated.View>
+  );
+};
+
+components/inventory/AddNewButton.tsx: 
+
+export const AddNewButton: React.FC<AddNewButtonProps> = ({ onPress }) => (
+  <TouchableOpacity style={styles.button} onPress={onPress}>
+    <Text style={styles.text}>Add New</Text>
+  </TouchableOpacity>
+);
+
+
+export default AddNewButton;
+components/inventory/TopBlur.tsx: 
+interface TopBlurProps {
+  color: Animated.SharedValue<string>;
+}
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+export const TopBlur: React.FC<TopBlurProps> = ({ color }) => {
+  return (
+    <AnimatedLinearGradient
+      colors={["rgba(243,243,245,255)", "rgba(255, 255, 255, 0)"]}
+      style={styles.topGradient}
+    />
+  );
+};
+
+
+constants/Colors.ts: /**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const mainOrange = '#FE7C22';
+const lightOrange = '#FFAE00';
+const lightPeach = '#FFF2E9';
+const black = '#101720';
+const darkGray = '#959595';
+const lightGray = '#BBBBBB';
+const white = '#FFFFFF';
+const back = "#f7f7f9"
+export const Colors = {
+  light: {
+    text: black,
+    background: back,
+    cont: white,
+    tint: mainOrange,
+    icon: darkGray,
+    tabIconDefault: lightGray,
+    tabIconSelected: mainOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+  dark: {
+    text: '#ECEDEE',
+    background: black,
+    tint: lightOrange,
+    icon: lightGray,
+    tabIconDefault: darkGray,
+    tabIconSelected: lightOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+};
+
+
+export const Gradients = {
+  main: [mainOrange, lightOrange],
+};
+
+export const Shadows = {
+  main: {
+    shadowColor: black,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+};
+components/YummyLogo.tsx: 
+
+interface YummyLogoProps {
+  style?: ImageStyle;
+}
+
+const YummyLogo: React.FC<YummyLogoProps> = ({ style }) => (
+  <Image
+    source={require('@/assets/images/yummy-logo.png')}
+    style={[styles.logo, style]}
+    resizeMode="contain"
+  />
+);
+
+
+export default YummyLogo;
+constants/responsive.ts: 
+const { width, height } = Dimensions.get('window');
+
+const guidelineBaseWidth = 390;
+const guidelineBaseHeight = 844;
+
+const scaleFactor = Platform.OS === 'ios' ? 1 : 0;
+
+export const horizontalScale = (size: number) => (width / guidelineBaseWidth) * size;
+export const verticalScale = (size: number) => (height / guidelineBaseHeight) * size
+export const moderateScale = (size: number, factor = 0.5) => {
+  const platformFactor = Platform.OS === 'ios' ? factor : factor * 0.8;
+  return size + (horizontalScale(size) - size) * platformFactor;
+};
+
+

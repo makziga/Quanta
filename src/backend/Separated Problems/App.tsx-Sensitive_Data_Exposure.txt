@@ -1,0 +1,5 @@
+Title of the problem is: Sensitive Data Exposure. Here is the description of the problem: The application may expose sensitive data through insecure APIs or data storage mechanisms. Ensure that sensitive data is properly protected and only accessible to authorized users.
+And here are the codes where this problem is appearing:
+App.tsx:
+
+

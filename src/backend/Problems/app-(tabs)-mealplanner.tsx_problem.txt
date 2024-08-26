@@ -1,0 +1,53 @@
+{
+  "summary": "The security analysis of the provided code and its components revealed several security issues, including insecure data handling, sensitive data exposure, and potential injection vulnerabilities.",
+  "analysisResults": [
+    {
+      "mainFile": "app/(tabs)/mealplanner.tsx",
+      "issues": [
+        {
+          "title": "Insecure Error Handling",
+          "description": "Error details are logged to the console, which can expose sensitive information.",
+          "details": "The error details in the handleGenerateFromForm function are logged to the console using console.error. This can expose sensitive information such as stack traces, error messages, and potentially user data.",
+          "fileNames": [
+            "app/(tabs)/mealplanner.tsx"
+          ]
+        },
+        {
+          "title": "Insecure Data Handling",
+          "description": "User input is directly used without validation or sanitization.",
+          "details": "The formData in the handleGenerateFromForm function is directly used to generate a meal plan without any validation or sanitization. This can lead to injection vulnerabilities if the input is not properly handled.",
+          "fileNames": [
+            "app/(tabs)/mealplanner.tsx",
+            "components/planner/MealPlanGeneratorForm.tsx"
+          ]
+        }
+      ]
+    },
+    {
+      "mainFile": "services/api.ts",
+      "issues": [
+        {
+          "title": "Insecure Error Handling",
+          "description": "Error details are logged to the console, which can expose sensitive information.",
+          "details": "The error details in the generateMealPlan function are logged to the console using console.error. This can expose sensitive information such as stack traces, error messages, and potentially user data.",
+          "fileNames": [
+            "services/api.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "mainFile": "components/planner/MealPlanModal.tsx",
+      "issues": [
+        {
+          "title": "Sensitive Data Exposure",
+          "description": "Sensitive data is logged to the console, which can expose user information.",
+          "details": "The currentDayData is logged to the console using console.log. This can expose sensitive information about the user's meal plan, including dates and meal details.",
+          "fileNames": [
+            "components/planner/MealPlanModal.tsx"
+          ]
+        }
+      ]
+    }
+  ]
+}

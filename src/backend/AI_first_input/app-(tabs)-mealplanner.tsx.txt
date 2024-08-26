@@ -1,0 +1,672 @@
+Main File:
+Path: app/(tabs)/mealplanner.tsx
+Code:   StyleSheet,
+  Text,
+  View,
+  FlatList,
+  StatusBar,
+  Alert,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+const MealPlannerScreen: React.FC = () => {
+  const [showGeneratorForm, setShowGeneratorForm] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  const [selectedMealPlan, setSelectedMealPlan] = useState<MealPlan | null>(
+    null
+  );
+
+  const handleMealPlanGeneratorPress = () => {
+    setShowGeneratorForm(true);
+  };
+
+  const handleCloseGeneratorForm = () => {
+    setShowGeneratorForm(false);
+  };
+
+  const handleGenerateFromForm = async (formData: MealPlanFormData) => {
+    setShowGeneratorForm(false);
+    setIsGenerating(true);
+    try {
+      const newMealPlan = await generateMealPlan(formData);
+      setMealPlans((prevPlans) => [newMealPlan, ...prevPlans]);
+    } catch (error) {
+      console.error("Error generating meal plan:", error);
+      Alert.alert("Error", "Failed to generate meal plan");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleMealPlanPress = (mealPlan: MealPlan) => {
+    setSelectedMealPlan(mealPlan);
+  };
+
+  const renderHeader = () => (
+    <View style={styles.logoContainer}>
+      <YummyLogo />
+    </View>
+  );
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <Text style={styles.title}>Meal Planner</Text>
+      <Text style={styles.subtitle}>Create schedule for meals and recipes</Text>
+      <MealPlanGenerator onPress={handleMealPlanGeneratorPress} />
+      <RecentMealPlans
+        mealPlans={mealPlans}
+        onMealPlanPress={handleMealPlanPress}
+      />
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
+      />
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={[{ key: "content" }]}
+        renderItem={renderContent}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={styles.listContent}
+      />
+      <MealPlanGeneratorForm
+        visible={showGeneratorForm}
+        onClose={handleCloseGeneratorForm}
+        onGenerate={handleGenerateFromForm}
+      />
+      <GeneratingModal
+        visible={isGenerating}
+        onCancel={() => setIsGenerating(false)}
+      />
+      {selectedMealPlan && (
+        <MealPlanModal
+          visible={!!selectedMealPlan}
+          onClose={() => setSelectedMealPlan(null)}
+          mealPlan={selectedMealPlan}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
+
+export default MealPlannerScreen;
+
+
+Files used in this main file:
+components/planner/GeneratingModal.tsx:   Modal,
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+
+interface GeneratingModalProps {
+  visible: boolean;
+  onCancel: () => void;
+}
+
+const GeneratingModal: React.FC<GeneratingModalProps> = ({
+  visible,
+  onCancel,
+}) => {
+  return (
+    <Modal transparent visible={visible} animationType="fade">
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalText}>Generating meal plan...</Text>
+          <ActivityIndicator
+            size="large"
+            color={Colors.light.mainOrange}
+            style={styles.spinner}
+          />
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+
+export default GeneratingModal;
+
+components/planner/MealPlanGeneratorForm.tsx:   View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface MealPlanGeneratorFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onGenerate: (formData: MealPlanFormData) => void;
+}
+
+const MealPlanGeneratorForm: React.FC<MealPlanGeneratorFormProps> = ({
+  visible,
+  onClose,
+  onGenerate,
+}) => {
+  const [formData, setFormData] = useState<MealPlanFormData>({
+    description: "",
+    dietType: "",
+    skillLevel: "",
+    length: "",
+    mealTypes: [],
+  });
+
+  const handleInputChange = (
+    field: keyof MealPlanFormData,
+    value: string | string[]
+  ) => {
+    setFormData((prevData) => ({ ...prevData, [field]: value }));
+  };
+
+  const handleGenerate = () => {
+    onGenerate(formData);
+  };
+
+  const lengthOptions = ["1 Day", "3 Days", "7 days ", "14 days"];
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.backButton}>
+              <Ionicons
+                name="arrow-back"
+                size={28}
+                color={Colors.light.black}
+              />
+            </TouchableOpacity>
+            <Text style={styles.title}>Generate Meal Plan</Text>
+          </View>
+          <ScrollView
+            style={styles.formContainer}
+            contentContainerStyle={styles.formContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TextInputField
+              label="Description"
+              value={formData.description}
+              onChangeText={(text) => handleInputChange("description", text)}
+              placeholder="Describe your meal plan"
+              required
+            />
+            <SingleChoiceField
+              label="Diet Type"
+              options={[
+                "Regular",
+                "Vegetarian",
+                "Vegan",
+                "Pescatarian",
+                "Keto",
+                "Paleo",
+                "Gluten-free",
+                "Dairy-free",
+              ]}
+              selectedOption={formData.dietType}
+              onSelect={(option) => handleInputChange("dietType", option)}
+              required
+            />
+            <SingleChoiceField
+              label="Skill Level"
+              options={["Easy", "Medium", "Hard"]}
+              selectedOption={formData.skillLevel}
+              onSelect={(option) => handleInputChange("skillLevel", option)}
+            />
+            <SingleChoiceField
+              label="Length"
+              options={lengthOptions}
+              selectedOption={formData.length}
+              onSelect={(option) => handleInputChange("length", option)}
+              required
+            />
+            <MultipleChoiceField
+              label="Meal Types"
+              options={["Breakfast", "Lunch", "Dinner", "Snack", "Dessert"]}
+              selectedOptions={formData.mealTypes}
+              onSelect={(options) => handleInputChange("mealTypes", options)}
+              required
+            />
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={handleGenerate}
+          >
+            <Text style={styles.generateButtonText}>Generate Meal Plan</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+
+export default MealPlanGeneratorForm;
+
+services/api.ts: 
+const API_BASE_URL = API_ENDPOINT;
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export interface MealPlanFormData {
+  description: string;
+  dietType: string;
+  skillLevel: string;
+  length: string;
+  mealTypes: string[];
+}
+
+export interface Recipe {
+  recipes: {
+    title: string;
+    description: string;
+    long_description: string;
+    time: string;
+    calories: string;
+    difficulty: string;
+    ingredients: {
+      name: string;
+      available: boolean;
+    }[];
+    directions: {
+      number: number;
+      title: string;
+      instructions: string;
+    }[];
+  }[];
+  id: string;
+  image: string;
+}
+
+export interface MealPlan {
+  id: string;
+  mealPlan: {
+    days: Day[];
+  };
+}
+
+export interface Day {
+  date: string;
+  meals: { [key: string]: string };
+  recipes: { [key: string]: Recipe };
+}
+
+export const generateMealPlan = async (
+  formData: MealPlanFormData
+): Promise<MealPlan> => {
+  try {
+    const response = await api.post<MealPlan>("/generate_meal_plan", formData);
+    return response.data;
+  } catch (error) {
+    console.error("Error generating meal plan:", error);
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(
+        error.response.data.error || "Failed to generate meal plan"
+      );
+    }
+    throw new Error("An unexpected error occurred");
+  }
+};
+
+export default api;
+
+components/planner/RecentMealPlans.tsx:   View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+interface RecentMealPlansProps {
+  mealPlans: MealPlan[];
+  onMealPlanPress: (mealPlan: MealPlan) => void;
+}
+
+const getImageUrl = (recipe: any) => {
+  if (recipe.image) {
+    return recipe.image;
+  }
+  return generateImageUrl(recipe.title || "Meal");
+};
+
+const MealPlanItem: React.FC<{ mealPlan: MealPlan; onPress: () => void }> = ({
+  mealPlan,
+  onPress,
+}) => {
+  const firstDay = mealPlan.mealPlan.days[0];
+  const firstRecipe = Object.values(firstDay.recipes)[0];
+
+  return (
+    <TouchableOpacity style={styles.mealPlanItem} onPress={onPress}>
+      <Image
+        source={{ uri: getImageUrl(firstRecipe) }}
+        style={styles.mealPlanImage}
+      />
+      <Text style={styles.mealPlanTitle} numberOfLines={1} ellipsizeMode="tail">
+        {`${mealPlan.mealPlan.days.length}-Day Meal Plan`}
+      </Text>
+      <Text style={styles.mealPlanDescription}>
+        {`${mealPlan.mealPlan.days.length} days | ${
+          Object.keys(firstDay.meals).length
+        } meals per day`}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+const RecentMealPlans: React.FC<RecentMealPlansProps> = ({
+  mealPlans,
+  onMealPlanPress,
+}) => {
+  if (mealPlans.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Recent Plans</Text>
+        <Text style={styles.noPlansText}>
+          No meal plans available. Generate your first meal plan!
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Recent Plans</Text>
+      <FlatList
+        data={mealPlans}
+        renderItem={({ item }) => (
+          <MealPlanItem mealPlan={item} onPress={() => onMealPlanPress(item)} />
+        )}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
+
+export default RecentMealPlans;
+
+components/planner/MealPlanModal.tsx:   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  SafeAreaView,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+interface MealPlanModalProps {
+  visible: boolean;
+  onClose: () => void;
+  mealPlan: MealPlan;
+}
+
+const MealPlanModal: React.FC<MealPlanModalProps> = ({
+  visible,
+  onClose,
+  mealPlan,
+}) => {
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [recipeModalVisible, setRecipeModalVisible] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [currentDayData, setCurrentDayData] = useState<Day | null>(null);
+
+  useEffect(() => {
+    if (mealPlan && mealPlan.mealPlan.days[selectedDay]) {
+      setCurrentDayData(mealPlan.mealPlan.days[selectedDay]);
+    }
+  }, [mealPlan, selectedDay]);
+
+  const handleDaySelect = (day: number) => {
+    console.log(`Selecting day: ${day}`);
+    setSelectedDay(day);
+  };
+
+  const handleRecipePress = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setRecipeModalVisible(true);
+  };
+
+  const handleRecipeComplete = (recipe: Recipe) => {
+    setRecipeModalVisible(false);
+  };
+
+  console.log(`Current day data:`, currentDayData);
+
+  if (!currentDayData) {
+    return null;
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.light.black} />
+          </TouchableOpacity>
+          <Text style={styles.headerText}>Back to Saved Plans</Text>
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {`${mealPlan.mealPlan.days.length}-Day Meal Plan`}
+          </Text>
+          <Text style={styles.subtitle}>
+            {`${mealPlan.mealPlan.days.length} days | ${
+              Object.keys(currentDayData.meals).length
+            } meals per day`}
+          </Text>
+          <DaySelector
+            days={mealPlan.mealPlan.days.map((day, index) => ({
+              dayOfWeek: `Day ${index + 1}`,
+              date: day.date,
+            }))}
+            selectedDay={selectedDay}
+            onDaySelect={handleDaySelect}
+          />
+          <ScrollView style={styles.mealsContainer}>
+            {Object.entries(currentDayData.recipes).map(
+              ([mealType, recipe]) => (
+                <View key={`${currentDayData.date}-${mealType}`}>
+                  <Text style={styles.mealTypeTitle}>{mealType}</Text>
+                  <MealItem
+                    meal={{
+                      type: mealType,
+                      recipe: recipe,
+                    }}
+                    onPress={() => handleRecipePress(recipe)}
+                  />
+                </View>
+              )
+            )}
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+      {selectedRecipe && (
+        <RecipeModal
+          visible={recipeModalVisible}
+          onClose={() => setRecipeModalVisible(false)}
+          recipe={selectedRecipe}
+          onComplete={handleRecipeComplete}
+        />
+      )}
+    </Modal>
+  );
+};
+
+
+export default MealPlanModal;
+
+constants/Colors.ts: /**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const mainOrange = '#FE7C22';
+const lightOrange = '#FFAE00';
+const lightPeach = '#FFF2E9';
+const black = '#101720';
+const darkGray = '#959595';
+const lightGray = '#BBBBBB';
+const white = '#FFFFFF';
+const back = "#f7f7f9"
+export const Colors = {
+  light: {
+    text: black,
+    background: back,
+    cont: white,
+    tint: mainOrange,
+    icon: darkGray,
+    tabIconDefault: lightGray,
+    tabIconSelected: mainOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+  dark: {
+    text: '#ECEDEE',
+    background: black,
+    tint: lightOrange,
+    icon: lightGray,
+    tabIconDefault: darkGray,
+    tabIconSelected: lightOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+};
+
+
+export const Gradients = {
+  main: [mainOrange, lightOrange],
+};
+
+export const Shadows = {
+  main: {
+    shadowColor: black,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+};
+components/planner/MealPlanGenerator.tsx:   View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface MealPlanGeneratorProps {
+  onPress: () => void;
+}
+
+const MealPlanGenerator: React.FC<MealPlanGeneratorProps> = ({ onPress }) => (
+  <View style={styles.container}>
+    <Text style={styles.title}>Plan your meal</Text>
+    <Text style={styles.subtitle}>
+      We'll craft a plan using your configuration
+    </Text>
+    <TouchableOpacity onPress={onPress}>
+      <LinearGradient
+        colors={Gradients.main}
+        style={styles.button}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
+        <Text style={styles.buttonText}>Generate Meal Plan</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </View>
+);
+
+
+export default MealPlanGenerator;
+
+components/YummyLogo.tsx: 
+
+interface YummyLogoProps {
+  style?: ImageStyle;
+}
+
+const YummyLogo: React.FC<YummyLogoProps> = ({ style }) => (
+  <Image
+    source={require('@/assets/images/yummy-logo.png')}
+    style={[styles.logo, style]}
+    resizeMode="contain"
+  />
+);
+
+
+export default YummyLogo;
+constants/responsive.ts: 
+const { width, height } = Dimensions.get('window');
+
+const guidelineBaseWidth = 390;
+const guidelineBaseHeight = 844;
+
+const scaleFactor = Platform.OS === 'ios' ? 1 : 0;
+
+export const horizontalScale = (size: number) => (width / guidelineBaseWidth) * size;
+export const verticalScale = (size: number) => (height / guidelineBaseHeight) * size
+export const moderateScale = (size: number, factor = 0.5) => {
+  const platformFactor = Platform.OS === 'ios' ? factor : factor * 0.8;
+  return size + (horizontalScale(size) - size) * platformFactor;
+};
+
+

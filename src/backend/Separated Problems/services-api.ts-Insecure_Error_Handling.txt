@@ -1,0 +1,76 @@
+Title of the problem is: Insecure Error Handling. Here is the description of the problem: The error details in the generateMealPlan function are logged to the console using console.error. This can expose sensitive information such as stack traces, error messages, and potentially user data.
+And here are the codes where this problem is appearing:
+services/api.ts:
+
+const API_BASE_URL = API_ENDPOINT;
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export interface MealPlanFormData {
+  description: string;
+  dietType: string;
+  skillLevel: string;
+  length: string;
+  mealTypes: string[];
+}
+
+export interface Recipe {
+  recipes: {
+    title: string;
+    description: string;
+    long_description: string;
+    time: string;
+    calories: string;
+    difficulty: string;
+    ingredients: {
+      name: string;
+      available: boolean;
+    }[];
+    directions: {
+      number: number;
+      title: string;
+      instructions: string;
+    }[];
+  }[];
+  id: string;
+  image: string;
+}
+
+export interface MealPlan {
+  id: string;
+  mealPlan: {
+    days: Day[];
+  };
+}
+
+export interface Day {
+  date: string;
+  meals: { [key: string]: string };
+  recipes: { [key: string]: Recipe };
+}
+
+export const generateMealPlan = async (
+  formData: MealPlanFormData
+): Promise<MealPlan> => {
+  try {
+    const response = await api.post<MealPlan>("/generate_meal_plan", formData);
+    return response.data;
+  } catch (error) {
+    console.error("Error generating meal plan:", error);
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(
+        error.response.data.error || "Failed to generate meal plan"
+      );
+    }
+    throw new Error("An unexpected error occurred");
+  }
+};
+
+export default api;
+
+

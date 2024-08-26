@@ -1,0 +1,5 @@
+Title of the problem is: Insecure Cryptographic Practices. Here is the description of the problem: The application may use weak cryptographic algorithms or improper key management practices, leading to potential data breaches. Use strong cryptographic algorithms and proper key management practices to protect sensitive data.
+And here are the codes where this problem is appearing:
+App.tsx:
+
+

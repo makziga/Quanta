@@ -1,0 +1,5 @@
+Title of the problem is: Insecure Data Handling in Navigation. Here is the description of the problem: The navigation component exposes sensitive data such as user IDs or tokens in the URL, which can be intercepted and exploited by attackers.
+And here are the codes where this problem is appearing:
+navigation/AppNavigator.tsx:
+
+

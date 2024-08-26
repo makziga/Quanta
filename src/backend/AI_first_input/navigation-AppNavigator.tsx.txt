@@ -1,0 +1,5 @@
+Main File:
+Path: navigation/AppNavigator.tsx
+Code: 
+
+Files used in this main file:

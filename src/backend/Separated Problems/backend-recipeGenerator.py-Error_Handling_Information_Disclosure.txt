@@ -1,0 +1,45 @@
+Title of the problem is: Error Handling Information Disclosure. Here is the description of the problem: The error handling in the generate_recipe2 function prints the error message to the console. This could expose sensitive information about the system or the error itself to an attacker.
+And here are the codes where this problem is appearing:
+backend/recipeGenerator.py:
+
+load_dotenv()
+
+AI71_API_KEY = os.getenv("AI71_API_KEY")
+ai71_client = AI71(AI71_API_KEY)
+
+def generate_recipe2(recipe_idea, diet_type, skill_level):
+    prompt = (
+        f"Your task is to generate a recipe using the provided user input and format it according to the given JSON structure. "
+        f"User wants to get a recipe for {recipe_idea}. Using user's input, generate a recipe that includes all the necessary components. "
+        f"Here is diet type that user choosed: {diet_type}, and here is skill level that user choosed: {skill_level}."
+        f"Follow these guidelines: 1. Create a recipe title that reflects the main ingredients or cooking method. "
+        f"2. Write a brief description of the dish. 3. Estimate the cooking time in minutes. 4. Provide an approximate calorie count per serving. "
+        f"5. Assign a difficulty level (Easy, Medium, or Hard). 6. List the ingredients, including quantities and units where appropriate. "
+        f"Use the user's preferred weight and liquid units. For each ingredient, randomly assign \"available\" as true or false. "
+        f"7. Create a list of directions, with each step numbered and including a brief title and detailed instructions. "
+        f"Use the user's preferred temperature unit in the instructions. "
+        f"8. Ensure the recipe does not include any ingredients the user is allergic to. "
+        f"9. You MUST create 5 - 15 directions for the recipe. "
+        f"Format your output as a JSON object with the following structure: {{ \"recipes\": [ {{ \"title\": \"Recipe Title\", \"description\": \"Short 8 words description of the dish\", "
+        f"\"long_description\": \"Long and detailed description of the dish\", \"time\": \"Estimated time in minutes\", \"calories\": Estimated calories per serving, "
+        f"\"difficulty\": \"{skill_level}\", \"ingredients\": [ {{ \"name\": \"Ingredient with quantity and unit\", \"available\": only true }}, ... ], "
+        f"\"directions\": [ {{ \"number\": Step number, \"title\": \"Brief step title\", \"instructions\": \"Detailed instructions for the step\" }}, ... ] }} ] }}"
+    )
+
+    try:
+        response = ai71_client.chat.completions.create(
+            model="tiiuae/falcon-180B-chat",
+            messages=[
+                {"role": "system", "content": "You are a recipe generator that creates recipes based on user input and outputs them in a specific JSON structure. "},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        recipe_json = response.choices[0].message.content.strip()
+        return json.loads(recipe_json)
+    except Exception as e:
+        print(f"Error generating recipe: {str(e)}")
+        return None
+

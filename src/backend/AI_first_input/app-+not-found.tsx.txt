@@ -1,0 +1,14 @@
+Main File:
+Path: app/+not-found.tsx
+Code: 
+export default function NotFoundScreen() {
+  return (
+    <>
+      <Stack.Screen options={{ title: 'Oops!' }} />
+    </>
+  );
+}
+
+
+
+Files used in this main file:

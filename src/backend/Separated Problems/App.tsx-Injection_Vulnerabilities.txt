@@ -1,0 +1,5 @@
+Title of the problem is: Injection Vulnerabilities. Here is the description of the problem: The application may be vulnerable to SQL or command injection attacks if user input is directly used in database queries or system commands without proper sanitization. Use parameterized queries and input validation to prevent injection attacks.
+And here are the codes where this problem is appearing:
+App.tsx:
+
+

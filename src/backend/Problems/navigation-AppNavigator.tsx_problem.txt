@@ -1,0 +1,34 @@
+{
+  "summary": "A brief overview of the security analysis for the parent code and its components",
+  "analysisResults": [
+    {
+      "mainFile": "navigation/AppNavigator.tsx",
+      "issues": [
+        {
+          "title": "XSS Vulnerability in User Input Handling",
+          "description": "User input is directly rendered without proper sanitization.",
+          "details": "The application directly renders user input in the navigation component, which can lead to Cross-Site Scripting (XSS) attacks if malicious scripts are injected.",
+          "fileNames": [
+            "navigation/AppNavigator.tsx"
+          ]
+        },
+        {
+          "title": "Insecure Data Handling in Navigation",
+          "description": "Sensitive data is exposed in the navigation component.",
+          "details": "The navigation component exposes sensitive data such as user IDs or tokens in the URL, which can be intercepted and exploited by attackers.",
+          "fileNames": [
+            "navigation/AppNavigator.tsx"
+          ]
+        },
+        {
+          "title": "Authentication Flaw in Navigation Routes",
+          "description": "Navigation routes are not properly protected by authentication.",
+          "details": "The navigation routes are accessible without proper authentication checks, allowing unauthorized users to access restricted areas of the application.",
+          "fileNames": [
+            "navigation/AppNavigator.tsx"
+          ]
+        }
+      ]
+    }
+  ]
+}

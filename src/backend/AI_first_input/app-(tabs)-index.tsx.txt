@@ -1,0 +1,702 @@
+Main File:
+Path: app/(tabs)/index.tsx
+Code:   StyleSheet,
+  View,
+  SafeAreaView,
+  Platform,
+  StatusBar,
+  ScrollView,
+} from "react-native";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+const HomeScreen: React.FC<HomeScreenProps> = () => {
+  const router = useRouter();
+  const [userName, setUserName] = useState("");
+  const [groceryCount, setGroceryCount] = useState(0);
+  const [recentRecipes, setRecentRecipes] = useState<Recipe[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isWelcomeModalVisible, setIsWelcomeModalVisible] = useState(true);
+
+  const { recipes, completeRecipe } = useRecipes();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const storedGroceryCount =
+        (await AsyncStorage.getItem("groceryCount")) || "0";
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+
+      setGroceryCount(parseInt(storedGroceryCount, 10));
+      if (storedRecipes) setRecentRecipes(JSON.parse(storedRecipes));
+    } catch (error) {
+      console.error("Failed to load data", error);
+    }
+  };
+
+  const handleInventoryPress = () => router.push("/inventory");
+  const handleGenerateRecipe = () => router.push("/recipes");
+  const handleViewAllRecipes = () => router.push("/recipes");
+  const handleRecipePress = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setIsModalVisible(true);
+  };
+  const { totalItemCount } = useInventory();
+
+  const closeModal = () => {
+    setIsModalVisible(false);
+    setSelectedRecipe(null);
+  };
+
+  const closeWelcomeModal = () => {
+    setIsWelcomeModalVisible(false);
+  };
+
+  const updateRecentRecipes = async (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recentRecipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    setRecentRecipes(updatedRecipes);
+    await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+  };
+
+  const handleRecipeComplete = (completedRecipe: Recipe) => {
+    completeRecipe(completedRecipe);
+    closeModal();
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.logoContainer}>
+          <YummyLogo />
+        </View>
+        <WelcomeMessage name={""} />
+        <InventoryOverview
+          groceryCount={groceryCount}
+          onPress={handleInventoryPress}
+        />
+        <RecipeGenerator onPress={handleGenerateRecipe} />
+        <RecentRecipes
+          recipes={recipes.slice(0, 4)}
+          onViewAll={handleViewAllRecipes}
+          onRecipePress={handleRecipePress}
+        />
+      </ScrollView>
+      {selectedRecipe && (
+        <RecipeModal
+          visible={isModalVisible}
+          onClose={closeModal}
+          recipe={selectedRecipe}
+          onComplete={handleRecipeComplete}
+        />
+      )}
+      <WelcomeModal
+        visible={isWelcomeModalVisible}
+        onClose={closeWelcomeModal}
+      />
+    </SafeAreaView>
+  );
+};
+
+
+export default HomeScreen;
+
+
+Files used in this main file:
+components/home/InventoryOverview.tsx: 
+const InventoryOverview: React.FC<InventoryOverviewProps> = ({ groceryCount, onPress }) => (
+  <TouchableOpacity style={styles.container} onPress={onPress}>
+    <Text style={styles.label}>Your Inventory has</Text>
+    <Text style={styles.count}>10 Groceries</Text>
+    <View style={styles.openInventory}>
+      <Text style={styles.openInventoryText}>Open your inventory</Text>
+      <Ionicons name="arrow-forward" size={16} color={Colors.light.lightGray} />
+    </View>
+  </TouchableOpacity>
+);
+
+
+export default InventoryOverview;
+context/InventoryContext.tsx: 
+interface InventoryContextType {
+  totalItemCount: number;
+  setTotalItemCount: (count: number) => void;
+}
+
+const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
+
+interface InventoryProviderProps {
+  children: ReactNode;
+}
+
+export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }) => {
+  const [totalItemCount, setTotalItemCount] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.setItem('totalItemCount', totalItemCount.toString());
+  }, [totalItemCount]);
+
+  return (
+    <InventoryContext.Provider value={{ totalItemCount, setTotalItemCount }}>
+      {children}
+    </InventoryContext.Provider>
+  );
+};
+
+export const useInventory = () => {
+  const context = useContext(InventoryContext);
+  if (context === undefined) {
+    throw new Error('useInventory must be used within an InventoryProvider');
+  }
+  return context;
+};
+components/recipes/RecipeModal.tsx:   View,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  Text,
+  Image,
+  ScrollView,
+  Platform,
+  Dimensions,
+} from "react-native";
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  runOnJS,
+} from "react-native-reanimated";
+  horizontalScale,
+  verticalScale,
+  moderateScale,
+} from "@/constants/responsive";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+interface RecipeModalProps {
+  visible: boolean;
+  onClose: () => void;
+  recipe: Recipe;
+  onComplete: (recipe: Recipe) => void;
+}
+
+const RecipeModal: React.FC<RecipeModalProps> = ({
+  visible,
+  onClose,
+  recipe,
+  onComplete,
+}) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const [showDirections, setShowDirections] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const slideAnim = useSharedValue(SCREEN_WIDTH);
+
+  const animateClose = useCallback(() => {
+    slideAnim.value = withTiming(
+      SCREEN_WIDTH,
+      {
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      },
+      (finished) => {
+        if (finished) {
+          runOnJS(setModalVisible)(false);
+          runOnJS(onClose)();
+        }
+      }
+    );
+  }, [slideAnim, onClose]);
+
+  useEffect(() => {
+    if (visible) {
+      setModalVisible(true);
+      slideAnim.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+    }
+  }, [visible, slideAnim]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideAnim.value }],
+  }));
+
+  const handleComplete = useCallback(() => {
+    onComplete(recipe);
+  }, [recipe, onComplete]);
+
+  const handleGetDirections = () => {
+    setShowDirections(true);
+    setCurrentStep(0);
+  };
+
+  const handleBackToInfo = () => {
+    setShowDirections(false);
+  };
+
+  const handleNextStep = () => {
+    if (currentStep < recipe.directions.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      animateClose();
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    } else {
+      handleBackToInfo();
+    }
+  };
+
+  const handleStepSelect = (step: number) => {
+    setCurrentStep(step);
+  };
+
+  return (
+    <Modal
+      transparent
+      visible={modalVisible}
+      onRequestClose={animateClose}
+      animationType="none"
+    >
+      <Animated.View style={[styles.modalContainer, animatedStyle]}>
+        <Image source={{ uri: recipe.image }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={animateClose}>
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={Colors.light.background}
+          />
+        </TouchableOpacity>
+        <View style={styles.contentWrapper}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            {!showDirections ? (
+              <RecipeInfo
+                recipe={recipe}
+                onGetDirections={handleGetDirections}
+              />
+            ) : (
+              <DirectionSteps
+                steps={recipe.directions}
+                currentStep={currentStep}
+                onBack={handlePreviousStep}
+                onNext={handleNextStep}
+                onStepSelect={handleStepSelect}
+              />
+            )}
+          </ScrollView>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              onPress={
+                !showDirections
+                  ? handleGetDirections
+                  : currentStep === recipe.directions.length - 1
+                  ? handleComplete
+                  : handleNextStep
+              }
+            >
+              <LinearGradient
+                colors={Gradients.main}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.button}
+              >
+                <Text style={styles.buttonText}>
+                  {!showDirections
+                    ? "Get Directions"
+                    : currentStep === recipe.directions.length - 1
+                    ? "Complete Recipe"
+                    : "Next Step"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+
+export default RecipeModal;
+
+components/home/WelcomeMessage.tsx:   horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+const WelcomeMessage: React.FC<WelcomeMessageProps> = () => (
+  <View style={styles.container}>
+    <Text style={styles.greeting}>Hello!</Text>
+    <Text style={styles.question}>What are you going to cook today?</Text>
+  </View>
+);
+
+
+export default WelcomeMessage;
+
+components/home/WelcomeModal.tsx: // components/WelcomeModal.tsx
+
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
+
+interface WelcomeModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const WelcomeModal: React.FC<WelcomeModalProps> = ({ visible, onClose }) => {
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <ScrollView contentContainerStyle={styles.scrollViewContent}>
+            <Text style={styles.modalHeader}>Hi!</Text>
+            <Text style={styles.modalText}>
+              First of all, thank you for testing my app! I put a lot of effort
+              into creating it, and I hope you enjoy using it. Before you start
+              testing, please make sure you are testing it locally instead
+              of using Vercel.{"\n\n"}
+              If you are using Vercel, you will only be able to view the
+              frontend to check the UI. Setting up a
+              mobile app on the web is very difficult, which is why the backend
+              won't work on Vercel.{"\n\n"}
+              If you are testing it locally, please follow the instructions in
+              the ReadMe file. The instructions are straightforward, and you can
+              easily run the backend if you follow them correctly.{"\n\n"}
+              One last note: the frontend is optimized for iOS devices since I
+              used them to create this app. It will also work on Android, but
+              some Android devices might experience frontend bugs. You can
+              ignore these issues because the backend will function properly.
+              {"\n\n"}I will continue working on this app, and I would love to
+              hear your feedback! You can find my contact information in the
+              ReadMe.{"\n\n"}
+              Thanks!{"\n"}- Mak Ž.
+            </Text>
+          </ScrollView>
+          <TouchableOpacity style={styles.generateButton} onPress={onClose}>
+            <Text style={styles.generateButtonText}>Let's get cooking</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+
+export default WelcomeModal;
+
+components/home/YummyLogo.tsx: 
+const YummyLogo = () => (
+  <Image
+    source={require('@/assets/images/yummy-logo.png')}
+    style={styles.logo}
+    resizeMode="contain"
+  />
+);
+
+
+export default YummyLogo;
+constants/Colors.ts: /**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const mainOrange = '#FE7C22';
+const lightOrange = '#FFAE00';
+const lightPeach = '#FFF2E9';
+const black = '#101720';
+const darkGray = '#959595';
+const lightGray = '#BBBBBB';
+const white = '#FFFFFF';
+const back = "#f7f7f9"
+export const Colors = {
+  light: {
+    text: black,
+    background: back,
+    cont: white,
+    tint: mainOrange,
+    icon: darkGray,
+    tabIconDefault: lightGray,
+    tabIconSelected: mainOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+  dark: {
+    text: '#ECEDEE',
+    background: black,
+    tint: lightOrange,
+    icon: lightGray,
+    tabIconDefault: darkGray,
+    tabIconSelected: lightOrange,
+    mainOrange,
+    lightOrange,
+    lightPeach,
+    black,
+    darkGray,
+    lightGray,
+  },
+};
+
+
+export const Gradients = {
+  main: [mainOrange, lightOrange],
+};
+
+export const Shadows = {
+  main: {
+    shadowColor: black,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+};
+components/home/RecipeGenerator.tsx:   View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+const RecipeGenerator: React.FC<RecipeGeneratorProps> = ({ onPress }) => (
+  <View style={styles.container}>
+    <Text style={styles.title}>You don't know what to eat?</Text>
+    <Text style={styles.subtitle}>We'll craft a recipe using your ideas!</Text>
+    <TouchableOpacity onPress={onPress}>
+      <LinearGradient
+        colors={Gradients.main}
+        style={styles.button}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
+        <Text style={styles.buttonText}>Generate Recipe</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </View>
+);
+
+
+export default RecipeGenerator;
+
+components/home/RecentRecipes.tsx:   View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Platform,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface RecentRecipesProps {
+  recipes: Recipe[];
+  onViewAll: () => void;
+  onRecipePress: (recipe: Recipe) => void;
+}
+
+const RecentRecipes: React.FC<RecentRecipesProps> = ({
+  recipes,
+  onViewAll,
+  onRecipePress,
+}) => {
+  const renderRecipeItem = (recipe: Recipe, index: number) => (
+    <TouchableOpacity
+      key={recipe.id}
+      style={[
+        styles.recipeItem,
+        index % 2 === 0 ? styles.leftItem : styles.rightItem,
+      ]}
+      onPress={() => onRecipePress(recipe)}
+    >
+      <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
+      <Text style={styles.recipeTitle} numberOfLines={1} ellipsizeMode="tail">
+        {recipe.title}
+      </Text>
+      <Text
+        style={styles.recipeDescription}
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
+        {recipe.description}
+      </Text>
+      <View style={styles.metaInfo}>
+        <MetaItem icon="time-outline" text={`${recipe.time} min`} />
+        <MetaItem icon="flame-outline" text={`${recipe.calories} Cal`} />
+        <MetaItem icon="speedometer-outline" text={recipe.difficulty} />
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Recent Recipes</Text>
+        <TouchableOpacity onPress={onViewAll}>
+          <Text style={styles.viewAllButton}>View All</Text>
+        </TouchableOpacity>
+      </View>
+      {recipes.length === 0 ? (
+        <Text style={styles.noRecipesText}>
+          No recipes available. Generate your first recipe!
+        </Text>
+      ) : (
+        <View style={styles.recipeGrid}>{recipes.map(renderRecipeItem)}</View>
+      )}
+    </View>
+  );
+};
+
+const MetaItem: React.FC<{
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+}> = ({ icon, text }) => (
+  <View style={styles.metaItem}>
+    <Ionicons name={icon} size={12} color={Colors.light.mainOrange} />
+    <Text style={styles.metaText}>{text}</Text>
+  </View>
+);
+
+
+export default RecentRecipes;
+
+context/RecipesContext.tsx:   createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+
+interface RecipesContextType {
+  recipes: Recipe[];
+  addRecipe: (newRecipe: Recipe) => void;
+  completeRecipe: (completedRecipe: Recipe) => void;
+  clearAllRecipes: () => void; // Add this new method
+}
+
+const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
+
+export const RecipesProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, []);
+
+  const loadRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+      if (storedRecipes) {
+        setRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error("Failed to load recipes", error);
+    }
+  };
+
+  const saveRecipes = async (updatedRecipes: Recipe[]) => {
+    try {
+      await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error("Failed to save recipes", error);
+    }
+  };
+
+  const addRecipe = (newRecipe: Recipe) => {
+    const updatedRecipes = [newRecipe, ...recipes];
+    saveRecipes(updatedRecipes);
+  };
+
+  const completeRecipe = (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    saveRecipes(updatedRecipes);
+  };
+
+  const clearAllRecipes = async () => {
+    try {
+      await AsyncStorage.removeItem("recipes");
+      setRecipes([]);
+    } catch (error) {
+      console.error("Failed to clear recipes", error);
+    }
+  };
+
+  return (
+    <RecipesContext.Provider
+      value={{ recipes, addRecipe, completeRecipe, clearAllRecipes }}
+    >
+      {children}
+    </RecipesContext.Provider>
+  );
+};
+
+export const useRecipes = () => {
+  const context = useContext(RecipesContext);
+  if (context === undefined) {
+    throw new Error("useRecipes must be used within a RecipesProvider");
+  }
+  return context;
+};
+
+constants/responsive.ts: 
+const { width, height } = Dimensions.get('window');
+
+const guidelineBaseWidth = 390;
+const guidelineBaseHeight = 844;
+
+const scaleFactor = Platform.OS === 'ios' ? 1 : 0;
+
+export const horizontalScale = (size: number) => (width / guidelineBaseWidth) * size;
+export const verticalScale = (size: number) => (height / guidelineBaseHeight) * size
+export const moderateScale = (size: number, factor = 0.5) => {
+  const platformFactor = Platform.OS === 'ios' ? factor : factor * 0.8;
+  return size + (horizontalScale(size) - size) * platformFactor;
+};
+
+

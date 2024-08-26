@@ -1,0 +1,169 @@
+Main File:
+Path: app/_layout.tsx
+Code:   DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+  const [loaded] = useFonts({
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+  });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
+
+  return (
+    <InventoryProvider>
+      <ThemeProvider value={colorScheme === "light" ? DarkTheme : DefaultTheme}>
+        <RecipesProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+        </RecipesProvider>
+      </ThemeProvider>
+    </InventoryProvider>
+  );
+}
+
+
+Files used in this main file:
+hooks/useColorScheme.ts: export { useColorScheme } from 'react-native';
+
+hooks/useColorScheme.web.ts: // NOTE: The default React Native styling doesn't support server rendering.
+// Server rendered styles should not change between the first render of the HTML
+// and the first render on the client. Typically, web developers will use CSS media queries
+// to render different styles on the client and server, these aren't directly supported in React Native
+// but can be achieved using a styling library like Nativewind.
+export function useColorScheme() {
+  return 'light';
+}
+
+context/InventoryContext.tsx: 
+interface InventoryContextType {
+  totalItemCount: number;
+  setTotalItemCount: (count: number) => void;
+}
+
+const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
+
+interface InventoryProviderProps {
+  children: ReactNode;
+}
+
+export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }) => {
+  const [totalItemCount, setTotalItemCount] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.setItem('totalItemCount', totalItemCount.toString());
+  }, [totalItemCount]);
+
+  return (
+    <InventoryContext.Provider value={{ totalItemCount, setTotalItemCount }}>
+      {children}
+    </InventoryContext.Provider>
+  );
+};
+
+export const useInventory = () => {
+  const context = useContext(InventoryContext);
+  if (context === undefined) {
+    throw new Error('useInventory must be used within an InventoryProvider');
+  }
+  return context;
+};
+context/RecipesContext.tsx:   createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+
+interface RecipesContextType {
+  recipes: Recipe[];
+  addRecipe: (newRecipe: Recipe) => void;
+  completeRecipe: (completedRecipe: Recipe) => void;
+  clearAllRecipes: () => void; // Add this new method
+}
+
+const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
+
+export const RecipesProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, []);
+
+  const loadRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+      if (storedRecipes) {
+        setRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error("Failed to load recipes", error);
+    }
+  };
+
+  const saveRecipes = async (updatedRecipes: Recipe[]) => {
+    try {
+      await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error("Failed to save recipes", error);
+    }
+  };
+
+  const addRecipe = (newRecipe: Recipe) => {
+    const updatedRecipes = [newRecipe, ...recipes];
+    saveRecipes(updatedRecipes);
+  };
+
+  const completeRecipe = (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    saveRecipes(updatedRecipes);
+  };
+
+  const clearAllRecipes = async () => {
+    try {
+      await AsyncStorage.removeItem("recipes");
+      setRecipes([]);
+    } catch (error) {
+      console.error("Failed to clear recipes", error);
+    }
+  };
+
+  return (
+    <RecipesContext.Provider
+      value={{ recipes, addRecipe, completeRecipe, clearAllRecipes }}
+    >
+      {children}
+    </RecipesContext.Provider>
+  );
+};
+
+export const useRecipes = () => {
+  const context = useContext(RecipesContext);
+  if (context === undefined) {
+    throw new Error("useRecipes must be used within a RecipesProvider");
+  }
+  return context;
+};
+

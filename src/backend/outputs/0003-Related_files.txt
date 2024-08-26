@@ -1,0 +1,149 @@
+{
+  "componentStructure": [
+    {
+      "mainFile": "App.tsx",
+      "components": []
+    },
+    {
+      "mainFile": "app/(tabs)/_layout.tsx",
+      "components": [
+        "hooks/useColorScheme.ts",
+        "hooks/useColorScheme.web.ts",
+        "constants/Colors.ts",
+        "components/navigation/TabBarIcon.tsx"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/cookingbot.tsx",
+      "components": [
+        "components/cooking-bot/ModelResponse.tsx",
+        "components/cooking-bot/ChatbotInput.tsx",
+        "components/cooking-bot/ChatMessage.tsx",
+        "constants/Colors.ts",
+        "components/cooking-bot/ClearConversationButton.tsx",
+        "components/YummyLogo.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/index.tsx",
+      "components": [
+        "components/home/InventoryOverview.tsx",
+        "context/InventoryContext.tsx",
+        "components/recipes/RecipeModal.tsx",
+        "components/home/WelcomeMessage.tsx",
+        "components/home/WelcomeModal.tsx",
+        "components/home/YummyLogo.tsx",
+        "constants/Colors.ts",
+        "components/home/RecipeGenerator.tsx",
+        "components/home/RecentRecipes.tsx",
+        "context/RecipesContext.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/inventory.tsx",
+      "components": [
+        "components/inventory/RemoveButton.tsx",
+        "context/InventoryContext.tsx",
+        "components/inventory/SelectButton.tsx",
+        "components/inventory/CategoryButton.tsx",
+        "components/inventory/ItemDetailsModal.tsx",
+        "components/inventory/CategorySection.tsx",
+        "components/inventory/AddNewModal.tsx",
+        "components/inventory/AddNewButton.tsx",
+        "components/inventory/TopBlur.tsx",
+        "constants/Colors.ts",
+        "components/YummyLogo.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/mealplanner.tsx",
+      "components": [
+        "components/planner/GeneratingModal.tsx",
+        "components/planner/MealPlanGeneratorForm.tsx",
+        "services/api.ts",
+        "components/planner/RecentMealPlans.tsx",
+        "components/planner/MealPlanModal.tsx",
+        "constants/Colors.ts",
+        "components/planner/MealPlanGenerator.tsx",
+        "components/YummyLogo.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/profile.tsx",
+      "components": [
+        "components/YummyLogo.tsx",
+        "constants/Colors.ts",
+        "context/RecipesContext.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/(tabs)/recipes.tsx",
+      "components": [
+        "components/recipes/ChatbotInput.tsx",
+        "components/recipes/RecipeModal.tsx",
+        "components/recipes/RecentRecipes.tsx",
+        "components/recipes/RecipeGenerator.tsx",
+        "constants/Colors.ts",
+        "components/recipes/RecipeGeneratorForm.tsx",
+        "components/YummyLogo.tsx",
+        "components/recipes/GeneratingModal.tsx",
+        "context/RecipesContext.tsx",
+        "constants/responsive.ts"
+      ]
+    },
+    {
+      "mainFile": "app/+html.tsx",
+      "components": []
+    },
+    {
+      "mainFile": "app/+not-found.tsx",
+      "components": []
+    },
+    {
+      "mainFile": "app/_layout.tsx",
+      "components": [
+        "hooks/useColorScheme.ts",
+        "hooks/useColorScheme.web.ts",
+        "context/InventoryContext.tsx",
+        "context/RecipesContext.tsx"
+      ]
+    },
+    {
+      "mainFile": "backend/ai71_client.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/app.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/imageGenerator.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/image_generator.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/planGenerator.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/recipeGenerator.py",
+      "components": []
+    },
+    {
+      "mainFile": "backend/recipe_generator.py",
+      "components": []
+    },
+    {
+      "mainFile": "navigation/AppNavigator.tsx",
+      "components": []
+    }
+  ]
+}

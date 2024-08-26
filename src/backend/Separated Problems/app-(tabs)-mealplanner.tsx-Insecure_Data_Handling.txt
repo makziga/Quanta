@@ -1,0 +1,234 @@
+Title of the problem is: Insecure Data Handling. Here is the description of the problem: The formData in the handleGenerateFromForm function is directly used to generate a meal plan without any validation or sanitization. This can lead to injection vulnerabilities if the input is not properly handled.
+And here are the codes where this problem is appearing:
+app/(tabs)/mealplanner.tsx:
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  StatusBar,
+  Alert,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+const MealPlannerScreen: React.FC = () => {
+  const [showGeneratorForm, setShowGeneratorForm] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  const [selectedMealPlan, setSelectedMealPlan] = useState<MealPlan | null>(
+    null
+  );
+
+  const handleMealPlanGeneratorPress = () => {
+    setShowGeneratorForm(true);
+  };
+
+  const handleCloseGeneratorForm = () => {
+    setShowGeneratorForm(false);
+  };
+
+  const handleGenerateFromForm = async (formData: MealPlanFormData) => {
+    setShowGeneratorForm(false);
+    setIsGenerating(true);
+    try {
+      const newMealPlan = await generateMealPlan(formData);
+      setMealPlans((prevPlans) => [newMealPlan, ...prevPlans]);
+    } catch (error) {
+      console.error("Error generating meal plan:", error);
+      Alert.alert("Error", "Failed to generate meal plan");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleMealPlanPress = (mealPlan: MealPlan) => {
+    setSelectedMealPlan(mealPlan);
+  };
+
+  const renderHeader = () => (
+    <View style={styles.logoContainer}>
+      <YummyLogo />
+    </View>
+  );
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <Text style={styles.title}>Meal Planner</Text>
+      <Text style={styles.subtitle}>Create schedule for meals and recipes</Text>
+      <MealPlanGenerator onPress={handleMealPlanGeneratorPress} />
+      <RecentMealPlans
+        mealPlans={mealPlans}
+        onMealPlanPress={handleMealPlanPress}
+      />
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
+      />
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={[{ key: "content" }]}
+        renderItem={renderContent}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={styles.listContent}
+      />
+      <MealPlanGeneratorForm
+        visible={showGeneratorForm}
+        onClose={handleCloseGeneratorForm}
+        onGenerate={handleGenerateFromForm}
+      />
+      <GeneratingModal
+        visible={isGenerating}
+        onCancel={() => setIsGenerating(false)}
+      />
+      {selectedMealPlan && (
+        <MealPlanModal
+          visible={!!selectedMealPlan}
+          onClose={() => setSelectedMealPlan(null)}
+          mealPlan={selectedMealPlan}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
+
+export default MealPlannerScreen;
+
+
+components/planner/MealPlanGeneratorForm.tsx:
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+interface MealPlanGeneratorFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onGenerate: (formData: MealPlanFormData) => void;
+}
+
+const MealPlanGeneratorForm: React.FC<MealPlanGeneratorFormProps> = ({
+  visible,
+  onClose,
+  onGenerate,
+}) => {
+  const [formData, setFormData] = useState<MealPlanFormData>({
+    description: "",
+    dietType: "",
+    skillLevel: "",
+    length: "",
+    mealTypes: [],
+  });
+
+  const handleInputChange = (
+    field: keyof MealPlanFormData,
+    value: string | string[]
+  ) => {
+    setFormData((prevData) => ({ ...prevData, [field]: value }));
+  };
+
+  const handleGenerate = () => {
+    onGenerate(formData);
+  };
+
+  const lengthOptions = ["1 Day", "3 Days", "7 days ", "14 days"];
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.backButton}>
+              <Ionicons
+                name="arrow-back"
+                size={28}
+                color={Colors.light.black}
+              />
+            </TouchableOpacity>
+            <Text style={styles.title}>Generate Meal Plan</Text>
+          </View>
+          <ScrollView
+            style={styles.formContainer}
+            contentContainerStyle={styles.formContentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TextInputField
+              label="Description"
+              value={formData.description}
+              onChangeText={(text) => handleInputChange("description", text)}
+              placeholder="Describe your meal plan"
+              required
+            />
+            <SingleChoiceField
+              label="Diet Type"
+              options={[
+                "Regular",
+                "Vegetarian",
+                "Vegan",
+                "Pescatarian",
+                "Keto",
+                "Paleo",
+                "Gluten-free",
+                "Dairy-free",
+              ]}
+              selectedOption={formData.dietType}
+              onSelect={(option) => handleInputChange("dietType", option)}
+              required
+            />
+            <SingleChoiceField
+              label="Skill Level"
+              options={["Easy", "Medium", "Hard"]}
+              selectedOption={formData.skillLevel}
+              onSelect={(option) => handleInputChange("skillLevel", option)}
+            />
+            <SingleChoiceField
+              label="Length"
+              options={lengthOptions}
+              selectedOption={formData.length}
+              onSelect={(option) => handleInputChange("length", option)}
+              required
+            />
+            <MultipleChoiceField
+              label="Meal Types"
+              options={["Breakfast", "Lunch", "Dinner", "Snack", "Dessert"]}
+              selectedOptions={formData.mealTypes}
+              onSelect={(options) => handleInputChange("mealTypes", options)}
+              required
+            />
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={handleGenerate}
+          >
+            <Text style={styles.generateButtonText}>Generate Meal Plan</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+
+export default MealPlanGeneratorForm;
+
+

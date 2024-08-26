@@ -1,0 +1,5 @@
+Title of the problem is: Security Misconfigurations. Here is the description of the problem: The application may have insecure default configurations that can be exploited by attackers. Ensure that the application is properly configured with secure settings to prevent security vulnerabilities.
+And here are the codes where this problem is appearing:
+App.tsx:
+
+

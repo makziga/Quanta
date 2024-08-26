@@ -1,0 +1,5 @@
+Title of the problem is: Authentication Flaw in Navigation Routes. Here is the description of the problem: The navigation routes are accessible without proper authentication checks, allowing unauthorized users to access restricted areas of the application.
+And here are the codes where this problem is appearing:
+navigation/AppNavigator.tsx:
+
+

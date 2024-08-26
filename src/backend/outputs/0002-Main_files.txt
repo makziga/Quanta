@@ -1,0 +1,23 @@
+{
+  "mainFiles": [
+    "App.tsx",
+    "app/(tabs)/_layout.tsx",
+    "app/(tabs)/cookingbot.tsx",
+    "app/(tabs)/index.tsx",
+    "app/(tabs)/inventory.tsx",
+    "app/(tabs)/mealplanner.tsx",
+    "app/(tabs)/profile.tsx",
+    "app/(tabs)/recipes.tsx",
+    "app/+html.tsx",
+    "app/+not-found.tsx",
+    "app/_layout.tsx",
+    "backend/ai71_client.py",
+    "backend/app.py",
+    "backend/imageGenerator.py",
+    "backend/image_generator.py",
+    "backend/planGenerator.py",
+    "backend/recipeGenerator.py",
+    "backend/recipe_generator.py",
+    "navigation/AppNavigator.tsx"
+  ]
+}

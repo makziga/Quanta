@@ -1,0 +1,104 @@
+Title of the problem is: Insecure Error Handling. Here is the description of the problem: The error details in the handleGenerateFromForm function are logged to the console using console.error. This can expose sensitive information such as stack traces, error messages, and potentially user data.
+And here are the codes where this problem is appearing:
+app/(tabs)/mealplanner.tsx:
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  StatusBar,
+  Alert,
+} from "react-native";
+  horizontalScale,
+  moderateScale,
+  verticalScale,
+} from "@/constants/responsive";
+
+const MealPlannerScreen: React.FC = () => {
+  const [showGeneratorForm, setShowGeneratorForm] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  const [selectedMealPlan, setSelectedMealPlan] = useState<MealPlan | null>(
+    null
+  );
+
+  const handleMealPlanGeneratorPress = () => {
+    setShowGeneratorForm(true);
+  };
+
+  const handleCloseGeneratorForm = () => {
+    setShowGeneratorForm(false);
+  };
+
+  const handleGenerateFromForm = async (formData: MealPlanFormData) => {
+    setShowGeneratorForm(false);
+    setIsGenerating(true);
+    try {
+      const newMealPlan = await generateMealPlan(formData);
+      setMealPlans((prevPlans) => [newMealPlan, ...prevPlans]);
+    } catch (error) {
+      console.error("Error generating meal plan:", error);
+      Alert.alert("Error", "Failed to generate meal plan");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleMealPlanPress = (mealPlan: MealPlan) => {
+    setSelectedMealPlan(mealPlan);
+  };
+
+  const renderHeader = () => (
+    <View style={styles.logoContainer}>
+      <YummyLogo />
+    </View>
+  );
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <Text style={styles.title}>Meal Planner</Text>
+      <Text style={styles.subtitle}>Create schedule for meals and recipes</Text>
+      <MealPlanGenerator onPress={handleMealPlanGeneratorPress} />
+      <RecentMealPlans
+        mealPlans={mealPlans}
+        onMealPlanPress={handleMealPlanPress}
+      />
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={Colors.light.background}
+      />
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={[{ key: "content" }]}
+        renderItem={renderContent}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={styles.listContent}
+      />
+      <MealPlanGeneratorForm
+        visible={showGeneratorForm}
+        onClose={handleCloseGeneratorForm}
+        onGenerate={handleGenerateFromForm}
+      />
+      <GeneratingModal
+        visible={isGenerating}
+        onCancel={() => setIsGenerating(false)}
+      />
+      {selectedMealPlan && (
+        <MealPlanModal
+          visible={!!selectedMealPlan}
+          onClose={() => setSelectedMealPlan(null)}
+          mealPlan={selectedMealPlan}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
+
+export default MealPlannerScreen;
+
+

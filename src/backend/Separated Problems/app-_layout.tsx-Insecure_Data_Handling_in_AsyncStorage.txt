@@ -1,0 +1,162 @@
+Title of the problem is: Insecure Data Handling in AsyncStorage. Here is the description of the problem: The code uses AsyncStorage to store and retrieve data without any encryption, which can expose sensitive information if the device is compromised. This is evident in the useEffect hook in InventoryProvider and the loadRecipes and saveRecipes functions in RecipesProvider.
+And here are the codes where this problem is appearing:
+app/_layout.tsx:
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+  const [loaded] = useFonts({
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+  });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
+
+  return (
+    <InventoryProvider>
+      <ThemeProvider value={colorScheme === "light" ? DarkTheme : DefaultTheme}>
+        <RecipesProvider>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+        </RecipesProvider>
+      </ThemeProvider>
+    </InventoryProvider>
+  );
+}
+
+
+context/InventoryContext.tsx:
+
+interface InventoryContextType {
+  totalItemCount: number;
+  setTotalItemCount: (count: number) => void;
+}
+
+const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
+
+interface InventoryProviderProps {
+  children: ReactNode;
+}
+
+export const InventoryProvider: React.FC<InventoryProviderProps> = ({ children }) => {
+  const [totalItemCount, setTotalItemCount] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.setItem('totalItemCount', totalItemCount.toString());
+  }, [totalItemCount]);
+
+  return (
+    <InventoryContext.Provider value={{ totalItemCount, setTotalItemCount }}>
+      {children}
+    </InventoryContext.Provider>
+  );
+};
+
+export const useInventory = () => {
+  const context = useContext(InventoryContext);
+  if (context === undefined) {
+    throw new Error('useInventory must be used within an InventoryProvider');
+  }
+  return context;
+};
+
+context/RecipesContext.tsx:
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+
+interface RecipesContextType {
+  recipes: Recipe[];
+  addRecipe: (newRecipe: Recipe) => void;
+  completeRecipe: (completedRecipe: Recipe) => void;
+  clearAllRecipes: () => void; // Add this new method
+}
+
+const RecipesContext = createContext<RecipesContextType | undefined>(undefined);
+
+export const RecipesProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    loadRecipes();
+  }, []);
+
+  const loadRecipes = async () => {
+    try {
+      const storedRecipes = await AsyncStorage.getItem("recipes");
+      if (storedRecipes) {
+        setRecipes(JSON.parse(storedRecipes));
+      }
+    } catch (error) {
+      console.error("Failed to load recipes", error);
+    }
+  };
+
+  const saveRecipes = async (updatedRecipes: Recipe[]) => {
+    try {
+      await AsyncStorage.setItem("recipes", JSON.stringify(updatedRecipes));
+      setRecipes(updatedRecipes);
+    } catch (error) {
+      console.error("Failed to save recipes", error);
+    }
+  };
+
+  const addRecipe = (newRecipe: Recipe) => {
+    const updatedRecipes = [newRecipe, ...recipes];
+    saveRecipes(updatedRecipes);
+  };
+
+  const completeRecipe = (completedRecipe: Recipe) => {
+    const updatedRecipes = [
+      completedRecipe,
+      ...recipes.filter((recipe) => recipe.id !== completedRecipe.id),
+    ];
+    saveRecipes(updatedRecipes);
+  };
+
+  const clearAllRecipes = async () => {
+    try {
+      await AsyncStorage.removeItem("recipes");
+      setRecipes([]);
+    } catch (error) {
+      console.error("Failed to clear recipes", error);
+    }
+  };
+
+  return (
+    <RecipesContext.Provider
+      value={{ recipes, addRecipe, completeRecipe, clearAllRecipes }}
+    >
+      {children}
+    </RecipesContext.Provider>
+  );
+};
+
+export const useRecipes = () => {
+  const context = useContext(RecipesContext);
+  if (context === undefined) {
+    throw new Error("useRecipes must be used within a RecipesProvider");
+  }
+  return context;
+};
+
+
